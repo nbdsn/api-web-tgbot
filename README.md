@@ -50,13 +50,38 @@ GITEE_REPO_URL=https://gitee.com/<你的账号>/<你的仓库>.git sudo bash /tm
 1. 本地打包：
 
 ```bash
-tar -czf api-web-tgbot.tar.gz .
+bash scripts/make_offline_package.sh
 ```
 
 2. 上传到服务器后执行：
 
 ```bash
-sudo bash scripts/install_offline.sh /tmp/api-web-tgbot.tar.gz
+mkdir -p /tmp/api-web-tgbot-offline
+tar -xzf /tmp/api-web-tgbot-offline-YYYYMMDD.tar.gz -C /tmp/api-web-tgbot-offline
+sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh menu /tmp/api-web-tgbot-offline
+```
+
+## 安装命令汇总
+
+- GitHub 在线安装：
+
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/nbdsn/api-web-tgbot/main/scripts/install_from_github.sh)
+```
+
+- Gitee 在线安装：
+
+```bash
+curl -fsSL https://gitee.com/<你的账号>/<你的仓库>/raw/main/scripts/install_from_gitee.sh -o /tmp/install_from_gitee.sh
+GITEE_REPO_URL=https://gitee.com/<你的账号>/<你的仓库>.git sudo bash /tmp/install_from_gitee.sh
+```
+
+- 离线安装（无 Git）：
+
+```bash
+mkdir -p /tmp/api-web-tgbot-offline
+tar -xzf /tmp/api-web-tgbot-offline-YYYYMMDD.tar.gz -C /tmp/api-web-tgbot-offline
+sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh menu /tmp/api-web-tgbot-offline
 ```
 
 执行后行为：
