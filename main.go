@@ -46,6 +46,7 @@ type AppConfig struct {
 	ProxyEnabled   bool
 	ProxyURL       string
 	TGAPIBase      string
+	PanelBaseURL   string
 
 	BotEnabled  bool
 	BotToken    string
@@ -217,6 +218,7 @@ func ensureDefaults(db *gorm.DB) error {
 			MainUseDB:        false,
 			ProxyEnabled:     false,
 			TGAPIBase:        "https://api.telegram.org",
+			PanelBaseURL:     "",
 			BotEnabled:       false,
 			PollSec:          5,
 			QuotaPer100:      50000000,
@@ -431,6 +433,9 @@ func (s *Server) apiSaveConfig(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.TGAPIBase) != "" {
 		cfg.TGAPIBase = strings.TrimSpace(req.TGAPIBase)
+	}
+	if strings.TrimSpace(req.PanelBaseURL) != "" {
+		cfg.PanelBaseURL = strings.TrimSpace(req.PanelBaseURL)
 	}
 	if req.MainPassword != "" && !strings.Contains(req.MainPassword, "***") {
 		cfg.MainPassword = req.MainPassword
@@ -729,7 +734,7 @@ func (s *Server) telegramLoop() {
 			continue
 		}
 
-		s.syncCommands(cfg.BotToken)
+		s.syncCommands(cfg)
 		if err := s.pollTelegram(cfg); err != nil {
 			log.Printf("telegram: poll failed: %v", err)
 			time.Sleep(3 * time.Second)
@@ -742,13 +747,13 @@ func (s *Server) telegramLoop() {
 	}
 }
 
-func (s *Server) syncCommands(token string) {
+func (s *Server) syncCommands(cfg AppConfig) {
 	s.commandMu.Lock()
-	if s.cmdToken == token && time.Now().Unix()-s.cmdAt < 3600 {
+	if s.cmdToken == cfg.BotToken && time.Now().Unix()-s.cmdAt < 3600 {
 		s.commandMu.Unlock()
 		return
 	}
-	s.cmdToken = token
+	s.cmdToken = cfg.BotToken
 	s.cmdAt = time.Now().Unix()
 	s.commandMu.Unlock()
 
@@ -759,13 +764,15 @@ func (s *Server) syncCommands(token string) {
 			{"command": "stats", "description": "使用统计和性能指标"},
 			{"command": "users", "description": "用户交互管理"},
 			{"command": "redeem", "description": "交互生成兑换码"},
+			{"command": "autoquota_now", "description": "立即执行自动额度处理"},
+			{"command": "open_admin", "description": "打开管理后台地址"},
+			{"command": "open_main", "description": "打开主程序地址"},
 		},
 	}
-	cfg, err := s.getConfig()
-	if err != nil {
-		return
-	}
 	_, _ = s.tgCall(cfg, "setMyCommands", commands)
+	_, _ = s.tgCall(cfg, "setChatMenuButton", map[string]any{
+		"menu_button": map[string]any{"type": "commands"},
+	})
 }
 
 func (s *Server) pollTelegram(cfg AppConfig) error {
@@ -831,7 +838,7 @@ func (s *Server) handleTGMessage(cfg AppConfig, msg *TelegramMessage) {
 		return
 	}
 
-	text, markup := s.executeTGCommand(strings.TrimSpace(msg.Text))
+	text, markup := s.executeTGCommand(cfg, strings.TrimSpace(msg.Text))
 	_, _ = s.tgSend(cfg, strconv.FormatInt(msg.Chat.ID, 10), text, markup)
 }
 
@@ -854,7 +861,7 @@ func (s *Server) handleTGCallback(cfg AppConfig, cb *TelegramCallback) {
 	_, _ = s.tgCall(cfg, "answerCallbackQuery", map[string]any{"callback_query_id": cb.ID, "text": ack})
 }
 
-func (s *Server) executeTGCommand(text string) (string, map[string]any) {
+func (s *Server) executeTGCommand(cfg AppConfig, text string) (string, map[string]any) {
 	fields := strings.Fields(text)
 	if len(fields) == 0 {
 		return s.helpText(), nil
@@ -869,6 +876,22 @@ func (s *Server) executeTGCommand(text string) (string, map[string]any) {
 		return s.tgUsersMenu()
 	case "/redeem":
 		return s.tgRedeemAmountMenu()
+	case "/autoquota_now":
+		msg, err := s.runAutoQuotaProcess(true)
+		if err != nil {
+			return "立即执行失败: " + err.Error(), nil
+		}
+		return msg, nil
+	case "/open_admin":
+		if strings.TrimSpace(cfg.PanelBaseURL) == "" {
+			return "未配置管理后台地址，请到 TG 功能页面填写“管理后台地址（用于 /open_admin）”。", nil
+		}
+		return "管理后台地址:\n" + strings.TrimSpace(cfg.PanelBaseURL), nil
+	case "/open_main":
+		if strings.TrimSpace(cfg.MainBaseURL) == "" {
+			return "未配置主程序地址，请到主程序连接页面填写。", nil
+		}
+		return "主程序地址:\n" + strings.TrimSpace(cfg.MainBaseURL), nil
 	default:
 		return s.helpText(), nil
 	}
@@ -880,6 +903,9 @@ func (s *Server) helpText() string {
 		"/stats 详细统计（请求、次数、额度、Tokens、RPM）",
 		"/users 用户概览 + 二级交互菜单",
 		"/redeem 交互生成兑换码",
+		"/autoquota_now 立即执行自动额度处理并返回日志",
+		"/open_admin 返回管理后台地址",
+		"/open_main 返回主程序地址",
 	}, "\n")
 }
 

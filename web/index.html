@@ -164,6 +164,8 @@
             <input id="tgApiBase" placeholder="https://api.telegram.org" />
           </div>
         </div>
+        <label>管理后台地址（用于 /open_admin）</label>
+        <input id="panelBaseURL" placeholder="例如 https://your-domain:361" />
         <label>管理员 TG ID（多个用逗号分割）</label>
         <input id="botAdminIDs" placeholder="例如 123456789,987654321" />
         <label>额度换算比例（100 对应多少底层额度）</label>
@@ -293,6 +295,7 @@
         botEnabled: Boolean(configCache.BotEnabled),
         botToken: configCache.BotToken || '',
         tgapiBase: configCache.TGAPIBase || 'https://api.telegram.org',
+        panelBaseURL: configCache.PanelBaseURL || '',
         botAdminIDs: configCache.BotAdminIDs || '',
         pollSec: Number(configCache.PollSec || 5),
         quotaPer100: Number(configCache.QuotaPer100 || 50000000),
@@ -323,6 +326,7 @@
       document.getElementById('pollSec').value = configCache.PollSec || 5;
       document.getElementById('botToken').value = '';
       document.getElementById('tgApiBase').value = configCache.TGAPIBase || 'https://api.telegram.org';
+      document.getElementById('panelBaseURL').value = configCache.PanelBaseURL || '';
       document.getElementById('botAdminIDs').value = configCache.BotAdminIDs || '';
       document.getElementById('quotaPer100').value = configCache.QuotaPer100 || 50000000;
 
@@ -369,6 +373,7 @@
       payload.botEnabled = document.getElementById('botEnabled').value === 'true';
       payload.botToken = document.getElementById('botToken').value.trim() || payload.botToken;
       payload.tgapiBase = document.getElementById('tgApiBase').value.trim();
+      payload.panelBaseURL = document.getElementById('panelBaseURL').value.trim();
       payload.botAdminIDs = document.getElementById('botAdminIDs').value.trim();
       payload.pollSec = Number(document.getElementById('pollSec').value || 5);
       payload.quotaPer100 = Number(document.getElementById('quotaPer100').value || 50000000);
