@@ -852,8 +852,27 @@ func (s *Server) handleTGCallback(cfg AppConfig, cb *TelegramCallback) {
 	}
 
 	text, markup, ack := s.executeTGCallback(cb.Data)
-	if cb.Message != nil && text != "" {
-		_, _ = s.tgSend(cfg, strconv.FormatInt(cb.Message.Chat.ID, 10), text, markup)
+	if text != "" {
+		sent := false
+		if cb.Message != nil && cb.Message.MessageID > 0 && cb.Message.Chat.ID != 0 {
+			if _, err := s.tgEdit(cfg, strconv.FormatInt(cb.Message.Chat.ID, 10), cb.Message.MessageID, text, markup); err == nil {
+				sent = true
+			} else {
+				log.Printf("telegram: edit callback message failed: %v", err)
+			}
+		}
+		if !sent {
+			targetChatID := strconv.FormatInt(cb.From.ID, 10)
+			if cb.Message != nil && cb.Message.Chat.ID != 0 {
+				targetChatID = strconv.FormatInt(cb.Message.Chat.ID, 10)
+			}
+			if _, err := s.tgSend(cfg, targetChatID, text, markup); err != nil {
+				log.Printf("telegram: send callback response failed: %v", err)
+				if ack == "" || ack == "已处理" {
+					ack = "处理失败，请看服务日志"
+				}
+			}
+		}
 	}
 	if ack == "" {
 		ack = "已处理"
@@ -1466,6 +1485,18 @@ func (s *Server) tgSend(cfg AppConfig, chatID, text string, markup map[string]an
 		payload["reply_markup"] = markup
 	}
 	return s.tgCall(cfg, "sendMessage", payload)
+}
+
+func (s *Server) tgEdit(cfg AppConfig, chatID string, messageID int, text string, markup map[string]any) ([]byte, error) {
+	payload := map[string]any{
+		"chat_id":    chatID,
+		"message_id": messageID,
+		"text":       text,
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	return s.tgCall(cfg, "editMessageText", payload)
 }
 
 func (s *Server) apiTGSendTest(c *gin.Context) {
