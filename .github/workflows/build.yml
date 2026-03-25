@@ -59,7 +59,7 @@ jobs:
 
   dockerhub:
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
     steps:
