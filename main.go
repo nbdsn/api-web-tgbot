@@ -1115,24 +1115,28 @@ func (s *Server) executeTGCallback(data string) (string, map[string]any, string)
 }
 
 func (s *Server) userActionMenu(uid int) (string, map[string]any, string) {
-	raw, err := s.mainAPI(http.MethodGet, fmt.Sprintf("/api/user/%d", uid), nil)
-	if err != nil {
-		return "读取用户失败: " + userFacingMainErr(err), nil, "读取失败"
-	}
-	u := getDataMap(raw)
-	quotaRaw := int64(getMapNumber(u, "quota"))
-	status := int(getMapNumber(u, "status"))
-	statusText := "停用"
-	if status == 1 {
-		statusText = "启用"
-	}
-
 	text := strings.Join([]string{
-		fmt.Sprintf("用户: %s (ID:%d)", getMapString(u, "username"), uid),
-		fmt.Sprintf("余额: %.2f", s.quotaRawToDisplay(quotaRaw)),
-		fmt.Sprintf("状态: %s", statusText),
+		fmt.Sprintf("用户 ID: %d", uid),
 		"请选择操作：",
 	}, "\n")
+	raw, err := s.mainAPI(http.MethodGet, fmt.Sprintf("/api/user/%d", uid), nil)
+	if err == nil {
+		u := getDataMap(raw)
+		quotaRaw := int64(getMapNumber(u, "quota"))
+		status := int(getMapNumber(u, "status"))
+		statusText := "停用"
+		if status == 1 {
+			statusText = "启用"
+		}
+		text = strings.Join([]string{
+			fmt.Sprintf("用户: %s (ID:%d)", getMapString(u, "username"), uid),
+			fmt.Sprintf("余额: %.2f", s.quotaRawToDisplay(quotaRaw)),
+			fmt.Sprintf("状态: %s", statusText),
+			"请选择操作：",
+		}, "\n")
+	} else {
+		text = text + "\n(提示: 未读取到详情，可直接操作额度/状态)"
+	}
 
 	markup := map[string]any{"inline_keyboard": [][]map[string]string{
 		{{"text": "增加额度", "callback_data": fmt.Sprintf("u:act:%d:add", uid)}, {"text": "减少额度", "callback_data": fmt.Sprintf("u:act:%d:sub", uid)}},
