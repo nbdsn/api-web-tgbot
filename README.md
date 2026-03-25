@@ -72,7 +72,27 @@ sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh
 
 ## Docker（可选，更快部署）
 
-### 方式 A：直接拉镜像运行（推荐）
+### 推荐目录规划（与你当前需求一致）
+- NewAPI 主程序数据目录：`/root/newapi`
+- 本项目（api-web-tgbot）数据目录：`/root/newapi/web`
+
+这样两套程序都在 `/root/newapi` 下，便于备份与迁移。
+
+### 1) NewAPI 主程序一键命令（映射到 /root/newapi）
+
+```bash
+docker run --name new-api -d --restart always \
+  -p 3000:3000 \
+  -e TZ=Asia/Shanghai \
+  -v /root/newapi:/data \
+  calciumion/new-api:latest
+```
+
+说明：
+- 你主程序数据库会在宿主机 `/root/newapi` 下（常见文件是 `one-api.db`）
+- 如果你的数据库文件是 `/root/newapi/one-api.db`，就是这个映射方式
+
+### 2) api-web-tgbot 一键命令（数据放 /root/newapi/web）
 Docker Hub 镜像（已发布）：
 
 ```bash
@@ -82,33 +102,33 @@ docker run -d \
   -p 8088:8088 \
   -e DATA_DIR=/data/api-web-tgbot \
   -e PORT=8088 \
-  -v /data/api-web-tgbot:/data/api-web-tgbot \
+  -v /root/newapi/web:/data/api-web-tgbot \
+  -v /root/newapi:/data/newapi:ro \
   nbdsn/api-web-tgbot:latest
 ```
 
 目录映射说明（非常重要）：
 - 容器内 `/data/api-web-tgbot`：本程序的数据目录（`manager.db`、自动额度处理日志、后台配置等）
-- 宿主机 `/data/api-web-tgbot`：你服务器上的持久化目录，可自定义为任何绝对路径
+- 宿主机 `/root/newapi/web`：本程序数据持久化目录
 - 这个映射只保存“本程序数据”，不会自动保存 NewAPI 主程序数据库
-
-如果你要让“数据库模式”读取主程序数据库（可选），再额外挂载主程序数据库目录，例如：
-
-```bash
-docker run -d \
-  --name api-web-tgbot \
-  --restart unless-stopped \
-  -p 8088:8088 \
-  -e DATA_DIR=/data/api-web-tgbot \
-  -e PORT=8088 \
-  -v /data/api-web-tgbot:/data/api-web-tgbot \
-  -v /data/newapi:/data/newapi:ro \
-  nbdsn/api-web-tgbot:latest
-```
-
-上面第二个挂载说明：
-- 宿主机 `/data/newapi`：NewAPI 主程序数据库所在目录（示例）
-- 容器内 `/data/newapi`：你在 Web 的“主程序数据库路径”里可填写这里的路径
+- 宿主机 `/root/newapi`：主程序数据库目录（只读挂载）
+- 容器内 `/data/newapi`：在 Web 的“主程序数据库路径”里填写这里的路径
 - `:ro` 为只读挂载，避免误写主程序文件
+
+### 3) 开启数据库模式时怎么填
+如果你主程序数据库在宿主机：
+- `/root/newapi/one-api.db`
+
+那在本程序 Web 后台里：
+- 打开“数据库模式”
+- 主程序数据库路径填写：`/data/newapi/one-api.db`
+
+### 4) TG 反代怎么填
+如果你反代域名是：
+- `https://telegram.202353.xyz`
+
+那在本程序 TG 配置里：
+- `TG API Base` 填：`https://telegram.202353.xyz`
 
 GHCR 镜像（可选）：
 
