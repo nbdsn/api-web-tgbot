@@ -27,6 +27,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var AppVersion = "dev"
+
 type AdminAccount struct {
 	ID           uint   `gorm:"primaryKey"`
 	Username     string `gorm:"uniqueIndex;size:64"`
@@ -335,7 +337,10 @@ func (s *Server) apiLogout(c *gin.Context) {
 }
 
 func (s *Server) apiMe(c *gin.Context) {
-	c.JSON(200, gin.H{"success": true, "data": gin.H{"username": sessions.Default(c).Get("username")}})
+	c.JSON(200, gin.H{"success": true, "data": gin.H{
+		"username": sessions.Default(c).Get("username"),
+		"version":  AppVersion,
+	}})
 }
 
 func (s *Server) apiUpdateAccount(c *gin.Context) {

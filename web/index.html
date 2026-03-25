@@ -56,6 +56,7 @@
     .inline { display: flex; gap: 8px; align-items: center; }
     .small { width: 120px; }
     .badge { display: inline-block; margin-right: 8px; margin-bottom: 8px; padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: #f5f8ff; }
+    .footer { color: var(--muted); font-size: 12px; text-align: right; padding: 6px 2px 2px; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { display: flex; gap: 8px; overflow-x: auto; }
@@ -247,6 +248,7 @@
         <div class="actions" style="margin-top:10px;"><button id="saveAccountBtn">保存账号设置</button></div>
         <div id="accountMsg" class="msg"></div>
       </section>
+      <div class="footer" id="versionText">版本: --</div>
     </main>
   </div>
 
@@ -574,6 +576,7 @@
       const data = await api('/api/me');
       if (data && data.success && data.data) {
         document.getElementById('helloText').textContent = `欢迎，${data.data.username}`;
+        document.getElementById('versionText').textContent = `版本: ${data.data.version || '--'}`;
       }
     }
 
