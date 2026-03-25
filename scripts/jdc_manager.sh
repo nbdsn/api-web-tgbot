@@ -54,22 +54,68 @@ print_header() {
 }
 
 ensure_go() {
+  local need_install="1"
   if command -v go >/dev/null 2>&1; then
+    local ver
+    ver="$(go env GOVERSION 2>/dev/null || true)"
+    if [[ -z "${ver}" ]]; then
+      ver="$(go version 2>/dev/null | awk '{print $3}')"
+    fi
+    ver="${ver#go}"
+    local major="${ver%%.*}"
+    local rest="${ver#*.}"
+    local minor="${rest%%.*}"
+    if [[ "${major}" =~ ^[0-9]+$ && "${minor}" =~ ^[0-9]+$ ]]; then
+      if (( major > 1 || (major == 1 && minor >= 22) )); then
+        need_install="0"
+      fi
+    fi
+  fi
+
+  if [[ "${need_install}" == "0" ]]; then
     return 0
   fi
 
-  log_warn "未检测到 Go，开始自动安装..."
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -y
-    DEBIAN_FRONTEND=noninteractive apt-get install -y golang-go
-  elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y golang
-  elif command -v yum >/dev/null 2>&1; then
-    yum install -y golang
+  log_warn "检测到 Go 不存在或版本过低，开始安装 Go 1.24.11..."
+  local arch
+  arch="$(uname -m)"
+  case "${arch}" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *)
+      log_err "不支持的架构: ${arch}"
+      exit 1
+      ;;
+  esac
+  local go_pkg="go1.24.11.linux-${arch}.tar.gz"
+  local go_url="https://go.dev/dl/${go_pkg}"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL "${go_url}" -o "/tmp/${go_pkg}"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O "/tmp/${go_pkg}" "${go_url}"
   else
-    log_err "当前系统无 apt/dnf/yum，无法自动安装 Go"
-    exit 1
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -y
+      DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+      curl -fL "${go_url}" -o "/tmp/${go_pkg}"
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf install -y curl
+      curl -fL "${go_url}" -o "/tmp/${go_pkg}"
+    elif command -v yum >/dev/null 2>&1; then
+      yum install -y curl
+      curl -fL "${go_url}" -o "/tmp/${go_pkg}"
+    else
+      log_err "系统缺少 curl/wget 且无法自动安装"
+      exit 1
+    fi
   fi
+
+  rm -rf /usr/local/go
+  tar -C /usr/local -xzf "/tmp/${go_pkg}"
+  ln -sf /usr/local/go/bin/go /usr/local/bin/go
+  ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+  log_info "Go 安装完成: $(/usr/local/bin/go version)"
 }
 
 setup_go_proxy() {
