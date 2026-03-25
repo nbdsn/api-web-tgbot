@@ -47,6 +47,24 @@ GITEE_REPO_URL=https://gitee.com/<你的账号>/<你的仓库>.git sudo bash /tm
 
 ## 离线安装（完全内网）
 
+### 离线包下载链接
+
+- GitHub Release（推荐，最新离线包）：
+
+```text
+https://github.com/nbdsn/api-web-tgbot/releases/latest/download/api-web-tgbot-offline-latest.tar.gz
+```
+
+如首次访问返回 404，说明该离线包尚未发布，请先执行一次 `bash scripts/make_offline_package.sh` 并上传到 Release。
+
+- Gitee Release（你同步后可用）：
+
+```text
+https://gitee.com/<你的账号>/<你的仓库>/releases/download/latest/api-web-tgbot-offline-latest.tar.gz
+```
+
+### 自己生成离线包
+
 1. 本地打包：
 
 ```bash
@@ -79,8 +97,9 @@ GITEE_REPO_URL=https://gitee.com/<你的账号>/<你的仓库>.git sudo bash /tm
 - 离线安装（无 Git）：
 
 ```bash
+curl -fL https://github.com/nbdsn/api-web-tgbot/releases/latest/download/api-web-tgbot-offline-latest.tar.gz -o /tmp/api-web-tgbot-offline-latest.tar.gz
 mkdir -p /tmp/api-web-tgbot-offline
-tar -xzf /tmp/api-web-tgbot-offline-YYYYMMDD.tar.gz -C /tmp/api-web-tgbot-offline
+tar -xzf /tmp/api-web-tgbot-offline-latest.tar.gz -C /tmp/api-web-tgbot-offline
 sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh menu /tmp/api-web-tgbot-offline
 ```
 
