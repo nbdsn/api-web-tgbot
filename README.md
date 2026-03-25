@@ -24,6 +24,15 @@ sudo bash <(curl -fsSL https://raw.githubusercontent.com/nbdsn/api-web-tgbot/mai
 - 未安装：先提示输入安装目录/数据目录/端口（回车用默认）
 - 已安装：直接进入管理菜单（启动/停止/重启/备份/还原/清库/卸载）
 
+版本说明：
+- 页面底部会显示版本号
+- 命令安装默认自动注入版本（tag 优先，如 `v1.0.0.1` 会显示 `1.0.0.1`；否则显示 `sha-xxxxxxx`）
+- 也可以手动指定版本号安装：
+
+```bash
+APP_VERSION=1.0.0.1 sudo bash <(curl -fsSL https://raw.githubusercontent.com/nbdsn/api-web-tgbot/main/scripts/install_from_github.sh)
+```
+
 ### 2) 国内服务器（无法拉 Git）离线安装
 
 离线包下载地址（发布后可直接下载）：
@@ -105,6 +114,20 @@ docker run -d \
   -v /root/newapi/web:/data/api-web-tgbot \
   -v /root/newapi:/data/newapi:ro \
   nbdsn/api-web-tgbot:latest
+```
+
+建议优先使用固定标签（可复现），例如：
+
+```bash
+docker run -d \
+  --name api-web-tgbot \
+  --restart unless-stopped \
+  -p 8088:8088 \
+  -e DATA_DIR=/data/api-web-tgbot \
+  -e PORT=8088 \
+  -v /root/newapi/web:/data/api-web-tgbot \
+  -v /root/newapi:/data/newapi:ro \
+  nbdsn/api-web-tgbot:sha-xxxxxxx
 ```
 
 目录映射说明（非常重要）：

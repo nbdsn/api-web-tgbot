@@ -1,10 +1,11 @@
 FROM golang:1.24-alpine AS builder
 RUN apk add --no-cache build-base
 WORKDIR /app
+ARG APP_VERSION=dev
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /out/api-web-tgbot .
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.AppVersion=${APP_VERSION}" -o /out/api-web-tgbot .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata

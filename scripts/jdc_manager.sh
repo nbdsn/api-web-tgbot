@@ -128,6 +128,29 @@ setup_go_proxy() {
   go env -w GOSUMDB="sum.golang.google.cn" || true
 }
 
+resolve_app_version() {
+  local src_dir="$1"
+  if [[ -n "${APP_VERSION:-}" ]]; then
+    echo "${APP_VERSION}"
+    return 0
+  fi
+  if command -v git >/dev/null 2>&1 && git -C "${src_dir}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local exact_tag
+    exact_tag="$(git -C "${src_dir}" describe --tags --exact-match 2>/dev/null || true)"
+    if [[ -n "${exact_tag}" ]]; then
+      echo "${exact_tag#v}"
+      return 0
+    fi
+    local short_sha
+    short_sha="$(git -C "${src_dir}" rev-parse --short HEAD 2>/dev/null || true)"
+    if [[ -n "${short_sha}" ]]; then
+      echo "sha-${short_sha}"
+      return 0
+    fi
+  fi
+  echo "dev"
+}
+
 install_app() {
   ensure_root
   local src_dir="${1:-$(pwd)}"
@@ -151,9 +174,11 @@ install_app() {
   setup_go_proxy
 
   mkdir -p "${INSTALL_DIR}" "${DATA_DIR}" "${CONFIG_DIR}"
+  local app_version
+  app_version="$(resolve_app_version "${src_dir}")"
 
-  log_info "编译程序中..."
-  (cd "${src_dir}" && go mod tidy && CGO_ENABLED=1 go build -o "${INSTALL_DIR}/${APP_NAME}" .)
+  log_info "编译程序中... 版本: ${app_version}"
+  (cd "${src_dir}" && go mod tidy && CGO_ENABLED=1 go build -ldflags "-X main.AppVersion=${app_version}" -o "${INSTALL_DIR}/${APP_NAME}" .)
 
   rm -rf "${INSTALL_DIR}/web"
   cp -R "${src_dir}/web" "${INSTALL_DIR}/web"
@@ -184,6 +209,7 @@ EOT
   systemctl restart "${SERVICE_NAME}"
 
   log_info "安装完成"
+  log_info "当前版本: ${app_version}"
   log_info "访问地址: http://服务器IP:${PORT}"
 }
 
