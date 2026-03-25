@@ -1061,7 +1061,7 @@ func (s *Server) executeTGCallback(data string) (string, map[string]any, string)
 				return "参数错误", nil, "参数错误"
 			}
 			uid, _ := strconv.Atoi(parts[2])
-			return s.userActionMenu(uid)
+			return s.userActionMenuQuick(uid)
 		case "act":
 			if len(parts) < 4 {
 				return "参数错误", nil, "参数错误"
@@ -1077,7 +1077,7 @@ func (s *Server) executeTGCallback(data string) (string, map[string]any, string)
 			op := parts[3]
 			amount, _ := strconv.Atoi(parts[4])
 			msg := s.applyUserQuota(uid, op == "add", amount)
-			text, markup, _ := s.userActionMenu(uid)
+			text, markup, _ := s.userActionMenuQuick(uid)
 			return msg + "\n\n" + text, markup, "额度已更新"
 		case "set":
 			if len(parts) < 4 {
@@ -1086,7 +1086,7 @@ func (s *Server) executeTGCallback(data string) (string, map[string]any, string)
 			uid, _ := strconv.Atoi(parts[2])
 			enable := parts[3] == "enable"
 			msg := s.applyUserStatus(uid, enable)
-			text, markup, _ := s.userActionMenu(uid)
+			text, markup, _ := s.userActionMenuQuick(uid)
 			return msg + "\n\n" + text, markup, "状态已更新"
 		}
 	}
@@ -1143,6 +1143,18 @@ func (s *Server) userActionMenu(uid int) (string, map[string]any, string) {
 		{{"text": "启用账户", "callback_data": fmt.Sprintf("u:set:%d:enable", uid)}, {"text": "停用账户", "callback_data": fmt.Sprintf("u:set:%d:disable", uid)}},
 	}}
 
+	return text, markup, "已打开"
+}
+
+func (s *Server) userActionMenuQuick(uid int) (string, map[string]any, string) {
+	text := strings.Join([]string{
+		fmt.Sprintf("用户 ID: %d", uid),
+		"请选择操作：",
+	}, "\n")
+	markup := map[string]any{"inline_keyboard": [][]map[string]string{
+		{{"text": "增加额度", "callback_data": fmt.Sprintf("u:act:%d:add", uid)}, {"text": "减少额度", "callback_data": fmt.Sprintf("u:act:%d:sub", uid)}},
+		{{"text": "启用账户", "callback_data": fmt.Sprintf("u:set:%d:enable", uid)}, {"text": "停用账户", "callback_data": fmt.Sprintf("u:set:%d:disable", uid)}},
+	}}
 	return text, markup, "已打开"
 }
 
