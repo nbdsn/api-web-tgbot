@@ -59,6 +59,7 @@ type Server struct {
 	clientMu     sync.Mutex
 	mainClient   *http.Client
 	mainBaseURL  string
+	mainUserID   int
 	sessionAlive bool
 
 	tgOffsetMu sync.Mutex
@@ -434,6 +435,7 @@ func (s *Server) getMainClient(cfg AppConfig) (*http.Client, error) {
 		jar, _ := cookiejar.New(nil)
 		s.mainClient = &http.Client{Timeout: 30 * time.Second, Jar: jar}
 		s.mainBaseURL = cfg.MainBaseURL
+		s.mainUserID = 0
 		s.sessionAlive = false
 	}
 
@@ -454,6 +456,11 @@ func (s *Server) getMainClient(cfg AppConfig) (*http.Client, error) {
 		if !isSuccess(raw) {
 			return nil, fmt.Errorf("主程序登录失败: %s", compactMessage(raw))
 		}
+		userID := getIntFromPath(raw, "data", "id")
+		if userID <= 0 {
+			return nil, fmt.Errorf("主程序登录失败: 未获取到用户ID")
+		}
+		s.mainUserID = userID
 		s.sessionAlive = true
 	}
 
@@ -482,6 +489,9 @@ func (s *Server) mainAPI(method, path string, body any) ([]byte, error) {
 	url := strings.TrimRight(cfg.MainBaseURL, "/") + path
 	req, _ := http.NewRequestWithContext(context.Background(), method, url, rd)
 	req.Header.Set("Content-Type", "application/json")
+	if s.mainUserID > 0 {
+		req.Header.Set("New-Api-User", strconv.Itoa(s.mainUserID))
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -491,6 +501,7 @@ func (s *Server) mainAPI(method, path string, body any) ([]byte, error) {
 
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		s.clientMu.Lock()
+		s.mainUserID = 0
 		s.sessionAlive = false
 		s.clientMu.Unlock()
 	}
@@ -1181,6 +1192,10 @@ func getInt64FromPath(raw []byte, p1, p2 string) int64 {
 	}
 	m1, _ := m[p1].(map[string]any)
 	return int64(getMapNumber(m1, p2))
+}
+
+func getIntFromPath(raw []byte, p1, p2 string) int {
+	return int(getInt64FromPath(raw, p1, p2))
 }
 
 func splitAdminIDs(input string) []string {
