@@ -73,7 +73,20 @@ sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh
 ## Docker（可选，更快部署）
 
 ### 方式 A：直接拉镜像运行（推荐）
-GHCR 镜像：
+Docker Hub 镜像（已发布）：
+
+```bash
+docker run -d \
+  --name api-web-tgbot \
+  --restart unless-stopped \
+  -p 8088:8088 \
+  -e DATA_DIR=/data/api-web-tgbot \
+  -e PORT=8088 \
+  -v /data/api-web-tgbot:/data/api-web-tgbot \
+  nbdsn/api-web-tgbot:latest
+```
+
+GHCR 镜像（可选）：
 
 ```bash
 docker run -d \
