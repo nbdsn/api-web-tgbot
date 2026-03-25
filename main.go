@@ -422,18 +422,18 @@ func (s *Server) apiSaveConfig(c *gin.Context) {
 		cfg.MainDBPath = ""
 	}
 	cfg.ProxyEnabled = req.ProxyEnabled
-	if req.ProxyURL != "" && !strings.HasPrefix(req.ProxyURL, "***") {
+	if req.ProxyURL != "" && !strings.Contains(req.ProxyURL, "***") {
 		cfg.ProxyURL = strings.TrimSpace(req.ProxyURL)
 	}
 	if strings.TrimSpace(req.TGAPIBase) != "" {
 		cfg.TGAPIBase = strings.TrimSpace(req.TGAPIBase)
 	}
-	if req.MainPassword != "" && !strings.HasPrefix(req.MainPassword, "***") {
+	if req.MainPassword != "" && !strings.Contains(req.MainPassword, "***") {
 		cfg.MainPassword = req.MainPassword
 	}
 
 	cfg.BotEnabled = req.BotEnabled
-	if req.BotToken != "" && !strings.HasPrefix(req.BotToken, "***") {
+	if req.BotToken != "" && !strings.Contains(req.BotToken, "***") {
 		cfg.BotToken = req.BotToken
 	}
 	cfg.BotAdminIDs = normalizeAdminIDs(req.BotAdminIDs)
@@ -882,7 +882,7 @@ func (s *Server) helpText() string {
 func (s *Server) tgStats() string {
 	statusRaw, err := s.mainAPI(http.MethodGet, "/api/status", nil)
 	if err != nil {
-		return "统计失败: " + err.Error()
+		return "统计失败: " + userFacingMainErr(err)
 	}
 	quotaPerUnit := getInt64FromPath(statusRaw, "data", "quota_per_unit")
 	if quotaPerUnit <= 0 {
@@ -894,7 +894,7 @@ func (s *Server) tgStats() string {
 
 	logStatRaw, err := s.mainAPI(http.MethodGet, fmt.Sprintf("/api/log/stat?type=2&start_timestamp=%d&end_timestamp=%d", since, now), nil)
 	if err != nil {
-		return "统计失败: " + err.Error()
+		return "统计失败: " + userFacingMainErr(err)
 	}
 
 	rpmRealtime := getInt64FromPath(logStatRaw, "data", "rpm")
@@ -903,7 +903,7 @@ func (s *Server) tgStats() string {
 
 	usersRaw, err := s.mainAPI(http.MethodGet, "/api/user/?p=0&page_size=1000", nil)
 	if err != nil {
-		return "统计失败: " + err.Error()
+		return "统计失败: " + userFacingMainErr(err)
 	}
 	users := getItems(usersRaw)
 	totalUsers := len(users)
@@ -918,7 +918,7 @@ func (s *Server) tgStats() string {
 
 	logsRaw, err := s.mainAPI(http.MethodGet, fmt.Sprintf("/api/log/?type=2&p=0&page_size=1000&start_timestamp=%d&end_timestamp=%d", since, now), nil)
 	if err != nil {
-		return "统计失败: " + err.Error()
+		return "统计失败: " + userFacingMainErr(err)
 	}
 	logTotal := getTotal(logsRaw)
 	logItems := getItems(logsRaw)
@@ -949,7 +949,7 @@ func (s *Server) tgStats() string {
 func (s *Server) tgUsersMenu() (string, map[string]any) {
 	raw, err := s.mainAPI(http.MethodGet, "/api/user/?p=0&page_size=1000", nil)
 	if err != nil {
-		return "读取用户失败: " + err.Error(), nil
+		return "读取用户失败: " + userFacingMainErr(err), nil
 	}
 
 	users := getItems(raw)
@@ -1063,7 +1063,7 @@ func (s *Server) executeTGCallback(data string) (string, map[string]any, string)
 func (s *Server) userActionMenu(uid int) (string, map[string]any, string) {
 	raw, err := s.mainAPI(http.MethodGet, fmt.Sprintf("/api/user/%d", uid), nil)
 	if err != nil {
-		return "读取用户失败: " + err.Error(), nil, "读取失败"
+		return "读取用户失败: " + userFacingMainErr(err), nil, "读取失败"
 	}
 	u := getDataMap(raw)
 	quotaRaw := int64(getMapNumber(u, "quota"))
@@ -1115,7 +1115,7 @@ func (s *Server) applyUserStatus(uid int, enable bool) string {
 	}
 	_, err := s.mainAPI(http.MethodPost, "/api/user/manage", map[string]any{"id": uid, "action": action})
 	if err != nil {
-		return "状态更新失败: " + err.Error()
+		return "状态更新失败: " + userFacingMainErr(err)
 	}
 	if enable {
 		return "已启用账户"
@@ -1126,7 +1126,7 @@ func (s *Server) applyUserStatus(uid int, enable bool) string {
 func (s *Server) applyUserQuota(uid int, increase bool, amount int) string {
 	raw, err := s.mainAPI(http.MethodGet, fmt.Sprintf("/api/user/%d", uid), nil)
 	if err != nil {
-		return "读取用户失败: " + err.Error()
+		return "读取用户失败: " + userFacingMainErr(err)
 	}
 	u := getDataMap(raw)
 
@@ -1153,7 +1153,7 @@ func (s *Server) applyUserQuota(uid int, increase bool, amount int) string {
 	}
 	_, err = s.mainAPI(http.MethodPut, "/api/user/", payload)
 	if err != nil {
-		return "额度更新失败: " + err.Error()
+		return "额度更新失败: " + userFacingMainErr(err)
 	}
 
 	return fmt.Sprintf("已%s %d，现有 %.2f", verb, amount, s.quotaRawToDisplay(newQuota))
@@ -1189,7 +1189,7 @@ func (s *Server) createRedeem(amount, count int) string {
 	}
 	raw, err := s.mainAPI(http.MethodPost, "/api/redemption/", payload)
 	if err != nil {
-		return "生成失败: " + err.Error()
+		return "生成失败: " + userFacingMainErr(err)
 	}
 	codes := getDataArrayString(raw)
 	lines := []string{fmt.Sprintf("生成成功：金额 %d，数量 %d，有效期永久", amount, count), "兑换码："}
@@ -1496,6 +1496,23 @@ func compactMessage(raw []byte) string {
 		}
 	}
 	return string(raw)
+}
+
+func userFacingMainErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "请先配置主程序连接") {
+		return "未配置可用 API 站点，请在 Web 的主程序连接里填写地址和管理员账号密码。"
+	}
+	if strings.Contains(msg, "主程序登录失败") {
+		return "API 站点登录失败，请检查主程序地址、管理员账号密码是否正确，或该账号是否被封禁。"
+	}
+	if strings.Contains(msg, "connect: connection refused") || strings.Contains(msg, "no such host") || strings.Contains(msg, "i/o timeout") {
+		return "API 站点不可达，请检查地址、端口、网络或代理设置。"
+	}
+	return msg
 }
 
 func getItems(raw []byte) []map[string]any {
