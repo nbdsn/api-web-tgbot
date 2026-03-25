@@ -72,6 +72,16 @@ ensure_go() {
   fi
 }
 
+setup_go_proxy() {
+  local current_proxy
+  current_proxy="$(go env GOPROXY 2>/dev/null || true)"
+  if [[ -z "${current_proxy}" || "${current_proxy}" == "https://proxy.golang.org,direct" ]]; then
+    log_info "配置 Go 代理为 goproxy.cn"
+    go env -w GOPROXY="https://goproxy.cn,direct" || true
+  fi
+  go env -w GOSUMDB="sum.golang.google.cn" || true
+}
+
 install_app() {
   ensure_root
   local src_dir="${1:-$(pwd)}"
@@ -92,6 +102,7 @@ install_app() {
   PORT="${PORT:-${PORT_DEFAULT}}"
 
   ensure_go
+  setup_go_proxy
 
   mkdir -p "${INSTALL_DIR}" "${DATA_DIR}" "${CONFIG_DIR}"
 
