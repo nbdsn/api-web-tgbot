@@ -1,0 +1,13 @@
+services:
+  api-web-tgbot:
+    build: .
+    container_name: api-web-tgbot
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - DATA_DIR=/data/api-web-tgbot
+      - PORT=8088
+      - SESSION_SECRET=change-this-secret
+    volumes:
+      - ./data:/data/api-web-tgbot

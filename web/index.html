@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API-WEB-TGBOT 管理台</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --panel: #ffffff;
+      --text: #1a2233;
+      --muted: #6f7b95;
+      --border: #d8e0ef;
+      --primary: #0b63f6;
+      --danger: #c62828;
+      --ok: #0f9d58;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, #eff4ff 0%, #f8fbff 40%, #f3f6fb 100%);
+      color: var(--text);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      background: #111a2e;
+      color: #e7eeff;
+      padding: 20px 14px;
+    }
+    .brand { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+    .menu-btn {
+      width: 100%;
+      border: 0;
+      text-align: left;
+      margin-bottom: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #d8e3ff;
+      background: transparent;
+      font-size: 14px;
+    }
+    .menu-btn.active,
+    .menu-btn:hover { background: #1c2a4b; color: #fff; }
+    .main { padding: 22px; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(20, 33, 61, 0.08);
+      margin-bottom: 14px;
+    }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    label { display: block; margin: 8px 0 6px; color: var(--muted); font-size: 13px; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-height: 38px;
+      padding: 8px 10px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+    }
+    textarea { min-height: 74px; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(11, 99, 246, 0.12); }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      min-height: 36px;
+      padding: 0 14px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button.gray { background: #63708b; }
+    button.red { background: var(--danger); }
+    .tip { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    .msg { margin-top: 10px; font-size: 13px; min-height: 18px; }
+    .msg.ok { color: var(--ok); }
+    .msg.err { color: var(--danger); }
+    .hidden { display: none; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: #fff;
+    }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      padding: 8px;
+      vertical-align: middle;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .inline { display: flex; gap: 8px; align-items: center; }
+    .small { width: 120px; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: flex; gap: 8px; overflow-x: auto; }
+      .brand { min-width: 160px; margin-bottom: 0; }
+      .menu-btn { width: auto; white-space: nowrap; margin: 0; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">API-WEB-TGBOT</div>
+      <button class="menu-btn active" data-tab="tab-main">主程序连接</button>
+      <button class="menu-btn" data-tab="tab-tg">TG 功能</button>
+      <button class="menu-btn" data-tab="tab-channel">渠道管理</button>
+      <button class="menu-btn" data-tab="tab-account">账号设置</button>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div id="helloText">欢迎</div>
+        <div class="actions">
+          <button class="gray" id="logoutBtn">退出登录</button>
+        </div>
+      </div>
+
+      <section id="tab-main" class="panel">
+        <h2>主程序连接配置</h2>
+        <div class="row">
+          <div>
+            <label>主程序地址</label>
+            <input id="mainBaseURL" placeholder="例如 http://127.0.0.1:3000" />
+          </div>
+          <div>
+            <label>主程序数据库路径</label>
+            <div class="inline">
+              <input id="mainDBPath" placeholder="例如 /data/newapi/one-api.db" />
+              <button type="button" class="gray small" id="searchDBBtn">一键搜索</button>
+            </div>
+            <select id="dbPathCandidates" class="hidden"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>主程序用户名</label>
+            <input id="mainUsername" />
+          </div>
+          <div>
+            <label>主程序密码</label>
+            <input id="mainPassword" type="password" placeholder="保持不变可留空" />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="saveMainBtn">保存连接配置</button>
+          <button class="gray" id="testMainBtn">测试连接</button>
+        </div>
+        <div id="mainMsg" class="msg"></div>
+      </section>
+
+      <section id="tab-tg" class="panel hidden">
+        <h2>TG 配置</h2>
+        <div class="row">
+          <div>
+            <label>启用 TG Bot</label>
+            <select id="botEnabled">
+              <option value="false">关闭</option>
+              <option value="true">开启</option>
+            </select>
+          </div>
+          <div>
+            <label>轮询间隔秒数</label>
+            <input id="pollSec" type="number" min="3" value="5" />
+          </div>
+        </div>
+        <label>Bot Token</label>
+        <input id="botToken" placeholder="保持不变可留空" />
+        <label>管理员 TG ID（多个用逗号分割）</label>
+        <input id="botAdminIDs" placeholder="例如 123456789,987654321" />
+        <label>额度换算比例（100 对应多少底层额度）</label>
+        <input id="quotaPer100" type="number" min="1" placeholder="默认 50000000" />
+        <div class="tip">说明：你在 TG 菜单输入加减额度 100，实际会换算为此配置对应的底层额度。</div>
+        <div class="actions" style="margin-top:10px;">
+          <button id="saveTGBtn">保存 TG 配置</button>
+        </div>
+        <div id="tgMsg" class="msg"></div>
+      </section>
+
+      <section id="tab-channel" class="panel hidden">
+        <h2>渠道管理</h2>
+        <div class="row">
+          <div>
+            <label>名称</label>
+            <input id="chName" placeholder="渠道名" />
+          </div>
+          <div>
+            <label>类型</label>
+            <input id="chType" type="number" value="1" />
+          </div>
+        </div>
+        <label>Key（可多个，逗号换行都可）</label>
+        <textarea id="chKey" placeholder="sk-xxx 或 key1,key2"></textarea>
+        <div class="row">
+          <div>
+            <label>模型白名单（可选）</label>
+            <input id="chModels" placeholder="gpt-4o,gpt-4.1" />
+          </div>
+          <div>
+            <label>状态</label>
+            <select id="chStatus"><option value="1">启用</option><option value="2">禁用</option></select>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="createChBtn">新增渠道</button>
+          <button class="gray" id="loadChBtn">刷新列表</button>
+        </div>
+        <div id="channelMsg" class="msg"></div>
+
+        <div style="margin-top:14px; overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>名称</th><th>类型</th><th>状态</th><th>额度</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="channelBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tab-account" class="panel hidden">
+        <h2>账号设置</h2>
+        <label>新账号</label>
+        <input id="newUsername" placeholder="例如 admin2" />
+        <label>旧密码（修改密码时必填）</label>
+        <input id="oldPassword" type="password" />
+        <label>新密码</label>
+        <input id="newPassword" type="password" />
+        <div class="actions" style="margin-top:10px;">
+          <button id="saveAccountBtn">保存账号设置</button>
+        </div>
+        <div id="accountMsg" class="msg"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let configCache = {};
+
+    function setMsg(id, ok, text) {
+      const el = document.getElementById(id);
+      el.className = 'msg ' + (ok ? 'ok' : 'err');
+      el.textContent = text || '';
+    }
+
+    async function api(url, options) {
+      const res = await fetch(url, options);
+      if (res.status === 302 || res.status === 401) {
+        location.href = '/login';
+        return null;
+      }
+      return res.json();
+    }
+
+    function bindTabs() {
+      const btns = document.querySelectorAll('.menu-btn');
+      btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          btns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          document.querySelectorAll('main section').forEach(sec => sec.classList.add('hidden'));
+          document.getElementById(btn.dataset.tab).classList.remove('hidden');
+        });
+      });
+    }
+
+    function collectConfig() {
+      return {
+        mainBaseURL: document.getElementById('mainBaseURL').value.trim(),
+        mainDBPath: document.getElementById('mainDBPath').value.trim(),
+        mainUsername: document.getElementById('mainUsername').value.trim(),
+        mainPassword: document.getElementById('mainPassword').value,
+        botEnabled: document.getElementById('botEnabled').value === 'true',
+        botToken: document.getElementById('botToken').value.trim(),
+        botAdminIDs: document.getElementById('botAdminIDs').value.trim(),
+        pollSec: Number(document.getElementById('pollSec').value || 5),
+        quotaPer100: Number(document.getElementById('quotaPer100').value || 50000000)
+      };
+    }
+
+    async function loadConfig() {
+      const data = await api('/api/config');
+      if (!data || !data.success) return;
+      configCache = data.data || {};
+      document.getElementById('mainBaseURL').value = configCache.MainBaseURL || '';
+      document.getElementById('mainDBPath').value = configCache.MainDBPath || '';
+      document.getElementById('mainUsername').value = configCache.MainUsername || '';
+      document.getElementById('mainPassword').value = '';
+      document.getElementById('botEnabled').value = String(Boolean(configCache.BotEnabled));
+      document.getElementById('botToken').value = '';
+      document.getElementById('botAdminIDs').value = configCache.BotAdminIDs || '';
+      document.getElementById('pollSec').value = configCache.PollSec || 5;
+      document.getElementById('quotaPer100').value = configCache.QuotaPer100 || 50000000;
+    }
+
+    async function saveConfig(msgTarget) {
+      const payload = collectConfig();
+      if (!payload.mainPassword && configCache.MainPassword) payload.mainPassword = configCache.MainPassword;
+      if (!payload.botToken && configCache.BotToken) payload.botToken = configCache.BotToken;
+
+      const data = await api('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!data || !data.success) {
+        setMsg(msgTarget, false, (data && data.message) || '保存失败');
+        return;
+      }
+      setMsg(msgTarget, true, '保存成功');
+      await loadConfig();
+    }
+
+    async function testMain() {
+      const data = await api('/api/health/main');
+      if (!data || !data.success) {
+        setMsg('mainMsg', false, (data && data.message) || '连接失败');
+        return;
+      }
+      setMsg('mainMsg', true, '连接正常');
+    }
+
+    async function searchDBPaths() {
+      setMsg('mainMsg', true, '正在搜索数据库路径...');
+      const data = await api('/api/db/search');
+      if (!data || !data.success) {
+        setMsg('mainMsg', false, (data && data.message) || '搜索失败');
+        return;
+      }
+      const list = data.data || [];
+      if (list.length === 0) {
+        setMsg('mainMsg', false, '未搜索到数据库文件，请手动填写');
+        return;
+      }
+      const sel = document.getElementById('dbPathCandidates');
+      sel.innerHTML = '';
+      list.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        sel.appendChild(opt);
+      });
+      sel.classList.remove('hidden');
+      document.getElementById('mainDBPath').value = list[0];
+      setMsg('mainMsg', true, `找到 ${list.length} 个数据库文件，已自动填入第一个`);
+    }
+
+    function bindSearchSelect() {
+      const sel = document.getElementById('dbPathCandidates');
+      sel.addEventListener('change', () => {
+        document.getElementById('mainDBPath').value = sel.value;
+      });
+    }
+
+    async function loadChannels() {
+      const data = await api('/api/channels');
+      const tbody = document.getElementById('channelBody');
+      tbody.innerHTML = '';
+      if (!data || !data.success) {
+        setMsg('channelMsg', false, (data && data.message) || '获取渠道失败');
+        return;
+      }
+      const items = (data.data && data.data.items) || [];
+      items.forEach(ch => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${ch.id || ''}</td>
+          <td>${ch.name || ''}</td>
+          <td>${ch.type || ''}</td>
+          <td>${ch.status || ''}</td>
+          <td>${ch.balance || ''}</td>
+          <td>
+            <button class="gray" data-action="toggle" data-id="${ch.id}" data-status="${ch.status}">${Number(ch.status) === 1 ? '停用' : '启用'}</button>
+            <button class="red" data-action="delete" data-id="${ch.id}">删除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      setMsg('channelMsg', true, `已加载 ${items.length} 条渠道`);
+    }
+
+    async function createChannel() {
+      const payload = {
+        name: document.getElementById('chName').value.trim(),
+        type: Number(document.getElementById('chType').value || 1),
+        key: document.getElementById('chKey').value.trim(),
+        status: Number(document.getElementById('chStatus').value || 1),
+        models: document.getElementById('chModels').value.trim()
+      };
+      if (!payload.name || !payload.key) {
+        setMsg('channelMsg', false, '名称和 Key 必填');
+        return;
+      }
+      const data = await api('/api/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!data || !data.success) {
+        setMsg('channelMsg', false, (data && data.message) || '新增失败');
+        return;
+      }
+      setMsg('channelMsg', true, '新增成功');
+      await loadChannels();
+    }
+
+    async function channelAction(action, id, status) {
+      if (action === 'delete') {
+        if (!confirm(`确定删除渠道 ${id} 吗？`)) return;
+        const data = await api(`/api/channels/${id}`, { method: 'DELETE' });
+        if (!data || !data.success) {
+          setMsg('channelMsg', false, (data && data.message) || '删除失败');
+          return;
+        }
+        setMsg('channelMsg', true, '删除成功');
+        await loadChannels();
+        return;
+      }
+      if (action === 'toggle') {
+        const next = Number(status) === 1 ? 2 : 1;
+        const data = await api(`/api/channels/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: next })
+        });
+        if (!data || !data.success) {
+          setMsg('channelMsg', false, (data && data.message) || '状态切换失败');
+          return;
+        }
+        setMsg('channelMsg', true, '状态切换成功');
+        await loadChannels();
+      }
+    }
+
+    async function saveAccount() {
+      const payload = {
+        username: document.getElementById('newUsername').value.trim(),
+        old_password: document.getElementById('oldPassword').value,
+        new_password: document.getElementById('newPassword').value
+      };
+      const data = await api('/api/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!data || !data.success) {
+        setMsg('accountMsg', false, (data && data.message) || '保存失败');
+        return;
+      }
+      setMsg('accountMsg', true, '账号设置已更新');
+      document.getElementById('oldPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('newUsername').value = '';
+      await loadMe();
+    }
+
+    async function loadMe() {
+      const data = await api('/api/me');
+      if (data && data.success && data.data) {
+        document.getElementById('helloText').textContent = `欢迎，${data.data.username}`;
+      }
+    }
+
+    function bindEvents() {
+      document.getElementById('saveMainBtn').addEventListener('click', () => saveConfig('mainMsg'));
+      document.getElementById('testMainBtn').addEventListener('click', testMain);
+      document.getElementById('saveTGBtn').addEventListener('click', () => saveConfig('tgMsg'));
+      document.getElementById('searchDBBtn').addEventListener('click', searchDBPaths);
+      document.getElementById('createChBtn').addEventListener('click', createChannel);
+      document.getElementById('loadChBtn').addEventListener('click', loadChannels);
+      document.getElementById('saveAccountBtn').addEventListener('click', saveAccount);
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await api('/api/logout', { method: 'POST' });
+        location.href = '/login';
+      });
+
+      document.getElementById('channelBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        const status = btn.dataset.status;
+        if (!action || !id) return;
+        await channelAction(action, id, status);
+      });
+    }
+
+    async function bootstrap() {
+      bindTabs();
+      bindSearchSelect();
+      bindEvents();
+      await loadMe();
+      await loadConfig();
+      await loadChannels();
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
