@@ -6,7 +6,6 @@
   <title>API-WEB-TGBOT 管理台</title>
   <style>
     :root {
-      --bg: #f3f6fb;
       --panel: #ffffff;
       --text: #1a2233;
       --muted: #6f7b95;
@@ -14,6 +13,7 @@
       --primary: #0b63f6;
       --danger: #c62828;
       --ok: #0f9d58;
+      --warn: #a15c00;
     }
     * { box-sizing: border-box; }
     body {
@@ -22,99 +22,40 @@
       background: linear-gradient(180deg, #eff4ff 0%, #f8fbff 40%, #f3f6fb 100%);
       color: var(--text);
     }
-    .layout {
-      display: grid;
-      grid-template-columns: 220px 1fr;
-      min-height: 100vh;
-    }
-    .sidebar {
-      background: #111a2e;
-      color: #e7eeff;
-      padding: 20px 14px;
-    }
+    .layout { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
+    .sidebar { background: #111a2e; color: #e7eeff; padding: 20px 14px; }
     .brand { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
     .menu-btn {
-      width: 100%;
-      border: 0;
-      text-align: left;
-      margin-bottom: 8px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      cursor: pointer;
-      color: #d8e3ff;
-      background: transparent;
-      font-size: 14px;
+      width: 100%; border: 0; text-align: left; margin-bottom: 8px; padding: 10px 12px;
+      border-radius: 10px; cursor: pointer; color: #d8e3ff; background: transparent; font-size: 14px;
     }
-    .menu-btn.active,
-    .menu-btn:hover { background: #1c2a4b; color: #fff; }
+    .menu-btn.active, .menu-btn:hover { background: #1c2a4b; color: #fff; }
     .main { padding: 22px; }
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 8px 20px rgba(20, 33, 61, 0.08);
-      margin-bottom: 14px;
-    }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 8px 20px rgba(20, 33, 61, 0.08); margin-bottom: 14px; }
     h2 { margin: 0 0 12px; font-size: 18px; }
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
+    h3 { margin: 12px 0 8px; font-size: 15px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     label { display: block; margin: 8px 0 6px; color: var(--muted); font-size: 13px; }
-    input, select, textarea {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      min-height: 38px;
-      padding: 8px 10px;
-      font-size: 14px;
-      outline: none;
-      background: #fff;
-    }
+    input, select, textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; min-height: 38px; padding: 8px 10px; font-size: 14px; outline: none; background: #fff; }
     textarea { min-height: 74px; }
     input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(11, 99, 246, 0.12); }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-    button {
-      border: 0;
-      border-radius: 8px;
-      min-height: 36px;
-      padding: 0 14px;
-      background: var(--primary);
-      color: #fff;
-      cursor: pointer;
-      font-size: 14px;
-    }
+    button { border: 0; border-radius: 8px; min-height: 36px; padding: 0 14px; background: var(--primary); color: #fff; cursor: pointer; font-size: 14px; }
     button.gray { background: #63708b; }
     button.red { background: var(--danger); }
+    button.warn { background: var(--warn); }
     .tip { color: var(--muted); font-size: 13px; margin-top: 8px; }
-    .msg { margin-top: 10px; font-size: 13px; min-height: 18px; }
+    .msg { margin-top: 10px; font-size: 13px; min-height: 18px; white-space: pre-wrap; }
     .msg.ok { color: var(--ok); }
     .msg.err { color: var(--danger); }
     .hidden { display: none; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      background: #fff;
-    }
-    th, td {
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-      padding: 8px;
-      vertical-align: middle;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+    th, td { border-bottom: 1px solid var(--border); text-align: left; padding: 8px; vertical-align: middle; }
     th { color: var(--muted); font-weight: 600; }
     .inline { display: flex; gap: 8px; align-items: center; }
     .small { width: 120px; }
+    .badge { display: inline-block; margin-right: 8px; margin-bottom: 8px; padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: #f5f8ff; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { display: flex; gap: 8px; overflow-x: auto; }
@@ -131,15 +72,14 @@
       <button class="menu-btn active" data-tab="tab-main">主程序连接</button>
       <button class="menu-btn" data-tab="tab-tg">TG 功能</button>
       <button class="menu-btn" data-tab="tab-channel">渠道管理</button>
+      <button class="menu-btn" data-tab="tab-auto">自动额度处理</button>
       <button class="menu-btn" data-tab="tab-account">账号设置</button>
     </aside>
 
     <main class="main">
       <div class="topbar">
         <div id="helloText">欢迎</div>
-        <div class="actions">
-          <button class="gray" id="logoutBtn">退出登录</button>
-        </div>
+        <div class="actions"><button class="gray" id="logoutBtn">退出登录</button></div>
       </div>
 
       <section id="tab-main" class="panel">
@@ -150,6 +90,22 @@
             <input id="mainBaseURL" placeholder="例如 http://127.0.0.1:3000" />
           </div>
           <div>
+            <label>主程序用户名</label>
+            <input id="mainUsername" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>主程序密码</label>
+            <input id="mainPassword" type="password" placeholder="保持不变可留空" />
+          </div>
+          <div>
+            <label>是否使用数据库模式</label>
+            <select id="mainUseDB"><option value="false">不使用（推荐）</option><option value="true">使用数据库</option></select>
+          </div>
+        </div>
+        <div id="dbModeBlock" class="row hidden">
+          <div>
             <label>主程序数据库路径</label>
             <div class="inline">
               <input id="mainDBPath" placeholder="例如 /data/newapi/one-api.db" />
@@ -158,21 +114,32 @@
             <select id="dbPathCandidates" class="hidden"></select>
           </div>
         </div>
+
+        <h3>代理配置</h3>
         <div class="row">
           <div>
-            <label>主程序用户名</label>
-            <input id="mainUsername" />
+            <label>启用代理</label>
+            <select id="proxyEnabled"><option value="false">关闭</option><option value="true">开启</option></select>
           </div>
           <div>
-            <label>主程序密码</label>
-            <input id="mainPassword" type="password" placeholder="保持不变可留空" />
+            <label>代理地址（支持 http/socks5）</label>
+            <input id="proxyURL" placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080" />
           </div>
         </div>
+
         <div class="actions">
           <button id="saveMainBtn">保存连接配置</button>
-          <button class="gray" id="testMainBtn">测试连接</button>
+          <button class="gray" id="testMainBtn">验证可用性</button>
         </div>
         <div id="mainMsg" class="msg"></div>
+
+        <h3>功能说明</h3>
+        <div>
+          <span class="badge">渠道管理：仅需主程序 API</span>
+          <span class="badge">TG 命令管理：仅需主程序 API</span>
+          <span class="badge">自动额度处理：仅需主程序 API</span>
+          <span class="badge">数据库模式：可选，仅在你确实要扫库时开启</span>
+        </div>
       </section>
 
       <section id="tab-tg" class="panel hidden">
@@ -180,25 +147,31 @@
         <div class="row">
           <div>
             <label>启用 TG Bot</label>
-            <select id="botEnabled">
-              <option value="false">关闭</option>
-              <option value="true">开启</option>
-            </select>
+            <select id="botEnabled"><option value="false">关闭</option><option value="true">开启</option></select>
           </div>
           <div>
             <label>轮询间隔秒数</label>
             <input id="pollSec" type="number" min="3" value="5" />
           </div>
         </div>
-        <label>Bot Token</label>
-        <input id="botToken" placeholder="保持不变可留空" />
+        <div class="row">
+          <div>
+            <label>Bot Token</label>
+            <input id="botToken" placeholder="保持不变可留空" />
+          </div>
+          <div>
+            <label>TG API Base（默认官方）</label>
+            <input id="tgApiBase" placeholder="https://api.telegram.org" />
+          </div>
+        </div>
         <label>管理员 TG ID（多个用逗号分割）</label>
         <input id="botAdminIDs" placeholder="例如 123456789,987654321" />
         <label>额度换算比例（100 对应多少底层额度）</label>
         <input id="quotaPer100" type="number" min="1" placeholder="默认 50000000" />
-        <div class="tip">说明：你在 TG 菜单输入加减额度 100，实际会换算为此配置对应的底层额度。</div>
+        <div class="tip">说明：TG 菜单里加减的额度，都会按这个比例换算到底层额度。</div>
         <div class="actions" style="margin-top:10px;">
           <button id="saveTGBtn">保存 TG 配置</button>
+          <button class="gray" id="tgTestBtn">发送测试消息</button>
         </div>
         <div id="tgMsg" class="msg"></div>
       </section>
@@ -206,56 +179,70 @@
       <section id="tab-channel" class="panel hidden">
         <h2>渠道管理</h2>
         <div class="row">
-          <div>
-            <label>名称</label>
-            <input id="chName" placeholder="渠道名" />
-          </div>
-          <div>
-            <label>类型</label>
-            <input id="chType" type="number" value="1" />
-          </div>
+          <div><label>名称</label><input id="chName" placeholder="渠道名" /></div>
+          <div><label>类型</label><input id="chType" type="number" value="1" /></div>
         </div>
         <label>Key（可多个，逗号换行都可）</label>
         <textarea id="chKey" placeholder="sk-xxx 或 key1,key2"></textarea>
         <div class="row">
-          <div>
-            <label>模型白名单（可选）</label>
-            <input id="chModels" placeholder="gpt-4o,gpt-4.1" />
-          </div>
-          <div>
-            <label>状态</label>
-            <select id="chStatus"><option value="1">启用</option><option value="2">禁用</option></select>
-          </div>
+          <div><label>模型白名单（可选）</label><input id="chModels" placeholder="gpt-4o,gpt-4.1" /></div>
+          <div><label>状态</label><select id="chStatus"><option value="1">启用</option><option value="2">禁用</option></select></div>
         </div>
         <div class="actions">
           <button id="createChBtn">新增渠道</button>
           <button class="gray" id="loadChBtn">刷新列表</button>
         </div>
         <div id="channelMsg" class="msg"></div>
-
         <div style="margin-top:14px; overflow:auto;">
           <table>
-            <thead>
-              <tr>
-                <th>ID</th><th>名称</th><th>类型</th><th>状态</th><th>额度</th><th>操作</th>
-              </tr>
-            </thead>
+            <thead><tr><th>ID</th><th>名称</th><th>类型</th><th>状态</th><th>额度</th><th>操作</th></tr></thead>
             <tbody id="channelBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tab-auto" class="panel hidden">
+        <h2>每日自动额度处理</h2>
+        <div class="row">
+          <div><label>启用每日自动额度处理</label><select id="autoQuotaEnabled"><option value="false">关闭</option><option value="true">开启</option></select></div>
+          <div><label>执行时间</label><input id="autoExecTime" placeholder="00:00" /></div>
+        </div>
+        <div class="row">
+          <div><label>低余额阈值</label><input id="lowQuotaThreshold" type="number" min="0" value="20" /></div>
+          <div><label>低余额补到多少</label><input id="lowQuotaTarget" type="number" min="0" value="100" /></div>
+        </div>
+        <div class="row">
+          <div><label>高余额阈值</label><input id="highQuotaThreshold" type="number" min="0" value="200" /></div>
+          <div><label>高余额压到多少</label><input id="highQuotaTarget" type="number" min="0" value="80" /></div>
+        </div>
+        <label>白名单账号（逗号、空格或换行分隔）</label>
+        <textarea id="autoWhitelist" placeholder="admin\nuser001,user002"></textarea>
+        <label>每日处理后推送管理员详细报告</label>
+        <select id="autoReportToAdmin"><option value="true">开启</option><option value="false">关闭</option></select>
+        <div class="actions" style="margin-top:10px;">
+          <button id="saveAutoBtn">保存自动处理配置</button>
+          <button class="warn" id="runAutoNowBtn">立即执行一次</button>
+          <button class="gray" id="loadAutoLogsBtn">刷新处理日志</button>
+        </div>
+        <div id="autoMsg" class="msg"></div>
+
+        <h3>最近处理日志</h3>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr><th>日期</th><th>用户</th><th>动作</th><th>原因</th><th>处理前</th><th>处理后</th><th>变动值</th></tr>
+            </thead>
+            <tbody id="autoLogBody"></tbody>
           </table>
         </div>
       </section>
 
       <section id="tab-account" class="panel hidden">
         <h2>账号设置</h2>
-        <label>新账号</label>
-        <input id="newUsername" placeholder="例如 admin2" />
-        <label>旧密码（修改密码时必填）</label>
-        <input id="oldPassword" type="password" />
-        <label>新密码</label>
-        <input id="newPassword" type="password" />
-        <div class="actions" style="margin-top:10px;">
-          <button id="saveAccountBtn">保存账号设置</button>
-        </div>
+        <label>新账号</label><input id="newUsername" placeholder="例如 admin2" />
+        <label>旧密码（修改密码时必填）</label><input id="oldPassword" type="password" />
+        <label>新密码</label><input id="newPassword" type="password" />
+        <div class="actions" style="margin-top:10px;"><button id="saveAccountBtn">保存账号设置</button></div>
         <div id="accountMsg" class="msg"></div>
       </section>
     </main>
@@ -281,27 +268,42 @@
 
     function bindTabs() {
       const btns = document.querySelectorAll('.menu-btn');
-      btns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          btns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          document.querySelectorAll('main section').forEach(sec => sec.classList.add('hidden'));
-          document.getElementById(btn.dataset.tab).classList.remove('hidden');
-        });
-      });
+      btns.forEach(btn => btn.addEventListener('click', () => {
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('main section').forEach(sec => sec.classList.add('hidden'));
+        document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      }));
+    }
+
+    function toggleDBMode() {
+      const useDB = document.getElementById('mainUseDB').value === 'true';
+      document.getElementById('dbModeBlock').classList.toggle('hidden', !useDB);
     }
 
     function collectConfig() {
       return {
         mainBaseURL: document.getElementById('mainBaseURL').value.trim(),
-        mainDBPath: document.getElementById('mainDBPath').value.trim(),
         mainUsername: document.getElementById('mainUsername').value.trim(),
         mainPassword: document.getElementById('mainPassword').value,
+        mainUseDB: document.getElementById('mainUseDB').value === 'true',
+        mainDBPath: document.getElementById('mainDBPath').value.trim(),
+        proxyEnabled: document.getElementById('proxyEnabled').value === 'true',
+        proxyURL: document.getElementById('proxyURL').value.trim(),
         botEnabled: document.getElementById('botEnabled').value === 'true',
         botToken: document.getElementById('botToken').value.trim(),
+        tgapiBase: document.getElementById('tgApiBase').value.trim(),
         botAdminIDs: document.getElementById('botAdminIDs').value.trim(),
         pollSec: Number(document.getElementById('pollSec').value || 5),
-        quotaPer100: Number(document.getElementById('quotaPer100').value || 50000000)
+        quotaPer100: Number(document.getElementById('quotaPer100').value || 50000000),
+        autoQuotaEnabled: document.getElementById('autoQuotaEnabled').value === 'true',
+        autoExecTime: document.getElementById('autoExecTime').value.trim(),
+        lowQuotaThreshold: Number(document.getElementById('lowQuotaThreshold').value || 20),
+        lowQuotaTarget: Number(document.getElementById('lowQuotaTarget').value || 100),
+        highQuotaThreshold: Number(document.getElementById('highQuotaThreshold').value || 200),
+        highQuotaTarget: Number(document.getElementById('highQuotaTarget').value || 80),
+        autoWhitelist: document.getElementById('autoWhitelist').value,
+        autoReportToAdmin: document.getElementById('autoReportToAdmin').value === 'true'
       };
     }
 
@@ -310,20 +312,37 @@
       if (!data || !data.success) return;
       configCache = data.data || {};
       document.getElementById('mainBaseURL').value = configCache.MainBaseURL || '';
-      document.getElementById('mainDBPath').value = configCache.MainDBPath || '';
       document.getElementById('mainUsername').value = configCache.MainUsername || '';
       document.getElementById('mainPassword').value = '';
+      document.getElementById('mainUseDB').value = String(Boolean(configCache.MainUseDB));
+      document.getElementById('mainDBPath').value = configCache.MainDBPath || '';
+      document.getElementById('proxyEnabled').value = String(Boolean(configCache.ProxyEnabled));
+      document.getElementById('proxyURL').value = '';
+
       document.getElementById('botEnabled').value = String(Boolean(configCache.BotEnabled));
-      document.getElementById('botToken').value = '';
-      document.getElementById('botAdminIDs').value = configCache.BotAdminIDs || '';
       document.getElementById('pollSec').value = configCache.PollSec || 5;
+      document.getElementById('botToken').value = '';
+      document.getElementById('tgApiBase').value = configCache.TGAPIBase || 'https://api.telegram.org';
+      document.getElementById('botAdminIDs').value = configCache.BotAdminIDs || '';
       document.getElementById('quotaPer100').value = configCache.QuotaPer100 || 50000000;
+
+      document.getElementById('autoQuotaEnabled').value = String(Boolean(configCache.AutoQuotaEnabled));
+      document.getElementById('autoExecTime').value = configCache.AutoExecTime || '00:00';
+      document.getElementById('lowQuotaThreshold').value = configCache.LowQuotaThreshold || 20;
+      document.getElementById('lowQuotaTarget').value = configCache.LowQuotaTarget || 100;
+      document.getElementById('highQuotaThreshold').value = configCache.HighQuotaThreshold || 200;
+      document.getElementById('highQuotaTarget').value = configCache.HighQuotaTarget || 80;
+      document.getElementById('autoWhitelist').value = configCache.AutoWhitelist || '';
+      document.getElementById('autoReportToAdmin').value = String(configCache.AutoReportToAdmin !== false);
+
+      toggleDBMode();
     }
 
-    async function saveConfig(msgTarget) {
+    async function saveAll(msgId) {
       const payload = collectConfig();
       if (!payload.mainPassword && configCache.MainPassword) payload.mainPassword = configCache.MainPassword;
       if (!payload.botToken && configCache.BotToken) payload.botToken = configCache.BotToken;
+      if (!payload.proxyURL && configCache.ProxyURL) payload.proxyURL = configCache.ProxyURL;
 
       const data = await api('/api/config', {
         method: 'POST',
@@ -331,20 +350,21 @@
         body: JSON.stringify(payload)
       });
       if (!data || !data.success) {
-        setMsg(msgTarget, false, (data && data.message) || '保存失败');
+        setMsg(msgId, false, (data && data.message) || '保存失败');
         return;
       }
-      setMsg(msgTarget, true, '保存成功');
+      setMsg(msgId, true, '保存成功');
       await loadConfig();
     }
 
     async function testMain() {
       const data = await api('/api/health/main');
       if (!data || !data.success) {
-        setMsg('mainMsg', false, (data && data.message) || '连接失败');
+        setMsg('mainMsg', false, (data && data.message) || '验证失败');
         return;
       }
-      setMsg('mainMsg', true, '连接正常');
+      const checks = (data.checks || []).join(', ');
+      setMsg('mainMsg', true, `${data.message || '连接可用'}\n检查项: ${checks}`);
     }
 
     async function searchDBPaths() {
@@ -372,11 +392,50 @@
       setMsg('mainMsg', true, `找到 ${list.length} 个数据库文件，已自动填入第一个`);
     }
 
-    function bindSearchSelect() {
-      const sel = document.getElementById('dbPathCandidates');
-      sel.addEventListener('change', () => {
-        document.getElementById('mainDBPath').value = sel.value;
+    async function sendTGTest() {
+      const data = await api('/api/tg/test', { method: 'POST' });
+      if (!data || !data.success) {
+        const fails = data && data.fails ? `\n${data.fails.join('\n')}` : '';
+        setMsg('tgMsg', false, ((data && data.message) || '发送失败') + fails);
+        return;
+      }
+      const fails = data.fails && data.fails.length ? `\n失败详情:\n${data.fails.join('\n')}` : '';
+      setMsg('tgMsg', true, data.message + fails);
+    }
+
+    async function runAutoNow() {
+      const data = await api('/api/auto-quota/run', { method: 'POST' });
+      if (!data || !data.success) {
+        setMsg('autoMsg', false, (data && data.message) || '执行失败');
+        return;
+      }
+      setMsg('autoMsg', true, data.message || '执行完成');
+      await loadAutoLogs();
+    }
+
+    async function loadAutoLogs() {
+      const data = await api('/api/auto-quota/logs?limit=200');
+      const body = document.getElementById('autoLogBody');
+      body.innerHTML = '';
+      if (!data || !data.success) {
+        setMsg('autoMsg', false, (data && data.message) || '日志读取失败');
+        return;
+      }
+      const items = data.data || [];
+      items.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${it.ProcessDate || ''}</td>
+          <td>${it.Username || ''}</td>
+          <td>${it.Action || ''}</td>
+          <td>${it.Reason || ''}</td>
+          <td>${Number(it.BeforeQuota || 0).toFixed(2)}</td>
+          <td>${Number(it.AfterQuota || 0).toFixed(2)}</td>
+          <td>${Number(it.DeltaQuota || 0).toFixed(2)}</td>
+        `;
+        body.appendChild(tr);
       });
+      setMsg('autoMsg', true, `已加载 ${items.length} 条日志`);
     }
 
     async function loadChannels() {
@@ -419,9 +478,7 @@
         return;
       }
       const data = await api('/api/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       if (!data || !data.success) {
         setMsg('channelMsg', false, (data && data.message) || '新增失败');
@@ -446,9 +503,7 @@
       if (action === 'toggle') {
         const next = Number(status) === 1 ? 2 : 1;
         const data = await api(`/api/channels/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: next })
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next })
         });
         if (!data || !data.success) {
           setMsg('channelMsg', false, (data && data.message) || '状态切换失败');
@@ -466,9 +521,7 @@
         new_password: document.getElementById('newPassword').value
       };
       const data = await api('/api/account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       if (!data || !data.success) {
         setMsg('accountMsg', false, (data && data.message) || '保存失败');
@@ -489,16 +542,29 @@
     }
 
     function bindEvents() {
-      document.getElementById('saveMainBtn').addEventListener('click', () => saveConfig('mainMsg'));
+      document.getElementById('mainUseDB').addEventListener('change', toggleDBMode);
+      document.getElementById('saveMainBtn').addEventListener('click', () => saveAll('mainMsg'));
       document.getElementById('testMainBtn').addEventListener('click', testMain);
-      document.getElementById('saveTGBtn').addEventListener('click', () => saveConfig('tgMsg'));
       document.getElementById('searchDBBtn').addEventListener('click', searchDBPaths);
+
+      document.getElementById('saveTGBtn').addEventListener('click', () => saveAll('tgMsg'));
+      document.getElementById('tgTestBtn').addEventListener('click', sendTGTest);
+
+      document.getElementById('saveAutoBtn').addEventListener('click', () => saveAll('autoMsg'));
+      document.getElementById('runAutoNowBtn').addEventListener('click', runAutoNow);
+      document.getElementById('loadAutoLogsBtn').addEventListener('click', loadAutoLogs);
+
       document.getElementById('createChBtn').addEventListener('click', createChannel);
       document.getElementById('loadChBtn').addEventListener('click', loadChannels);
+
       document.getElementById('saveAccountBtn').addEventListener('click', saveAccount);
       document.getElementById('logoutBtn').addEventListener('click', async () => {
         await api('/api/logout', { method: 'POST' });
         location.href = '/login';
+      });
+
+      document.getElementById('dbPathCandidates').addEventListener('change', () => {
+        document.getElementById('mainDBPath').value = document.getElementById('dbPathCandidates').value;
       });
 
       document.getElementById('channelBody').addEventListener('click', async (e) => {
@@ -514,11 +580,11 @@
 
     async function bootstrap() {
       bindTabs();
-      bindSearchSelect();
       bindEvents();
       await loadMe();
       await loadConfig();
       await loadChannels();
+      await loadAutoLogs();
     }
 
     bootstrap();

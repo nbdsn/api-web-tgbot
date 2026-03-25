@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -37,10 +38,14 @@ type AdminAccount struct {
 type AppConfig struct {
 	ID uint `gorm:"primaryKey"`
 
-	MainBaseURL  string
-	MainUsername string
-	MainPassword string
-	MainDBPath   string
+	MainBaseURL    string
+	MainUsername   string
+	MainPassword   string
+	MainUseDB      bool
+	MainDBPath     string
+	ProxyEnabled   bool
+	ProxyURL       string
+	TGAPIBase      string
 
 	BotEnabled  bool
 	BotToken    string
@@ -48,9 +53,30 @@ type AppConfig struct {
 	PollSec     int
 
 	QuotaPer100 int64
+	AutoQuotaEnabled      bool
+	AutoExecTime          string
+	LowQuotaThreshold     int
+	LowQuotaTarget        int
+	HighQuotaThreshold    int
+	HighQuotaTarget       int
+	AutoWhitelist         string
+	AutoReportToAdmin     bool
+	LastAutoProcessDate   string
 
 	CreatedAt int64
 	UpdatedAt int64
+}
+
+type AutoQuotaLog struct {
+	ID          uint `gorm:"primaryKey"`
+	ProcessDate string
+	Username    string
+	Action      string
+	Reason      string
+	BeforeQuota float64
+	AfterQuota  float64
+	DeltaQuota  float64
+	CreatedAt   int64
 }
 
 type Server struct {
@@ -68,6 +94,8 @@ type Server struct {
 	commandMu sync.Mutex
 	cmdToken  string
 	cmdAt     int64
+
+	autoRunMu sync.Mutex
 }
 
 type TelegramUpdateResp struct {
@@ -117,7 +145,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := db.AutoMigrate(&AdminAccount{}, &AppConfig{}); err != nil {
+	if err := db.AutoMigrate(&AdminAccount{}, &AppConfig{}, &AutoQuotaLog{}); err != nil {
 		log.Fatal(err)
 	}
 	if err := ensureDefaults(db); err != nil {
@@ -146,6 +174,9 @@ func main() {
 		authed.POST("/api/config", s.apiSaveConfig)
 		authed.GET("/api/health/main", s.apiMainHealth)
 		authed.GET("/api/db/search", s.apiSearchDBPaths)
+		authed.POST("/api/tg/test", s.apiTGSendTest)
+		authed.POST("/api/auto-quota/run", s.apiRunAutoQuotaNow)
+		authed.GET("/api/auto-quota/logs", s.apiAutoQuotaLogs)
 
 		authed.GET("/api/channels", s.apiGetChannels)
 		authed.POST("/api/channels", s.apiCreateChannel)
@@ -154,6 +185,7 @@ func main() {
 	}
 
 	go s.telegramLoop()
+	go s.autoQuotaLoop()
 
 	log.Printf("api-web-tgbot started at :%s", port)
 	if err := r.Run(":" + port); err != nil {
@@ -180,15 +212,61 @@ func ensureDefaults(db *gorm.DB) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		now := time.Now().Unix()
 		cfg = AppConfig{
-			ID:          1,
-			MainBaseURL: "http://127.0.0.1:3000",
-			BotEnabled:  false,
-			PollSec:     5,
-			QuotaPer100: 50000000,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:               1,
+			MainBaseURL:      "http://127.0.0.1:3000",
+			MainUseDB:        false,
+			ProxyEnabled:     false,
+			TGAPIBase:        "https://api.telegram.org",
+			BotEnabled:       false,
+			PollSec:          5,
+			QuotaPer100:      50000000,
+			AutoExecTime:     "00:00",
+			LowQuotaThreshold:  20,
+			LowQuotaTarget:     100,
+			HighQuotaThreshold: 200,
+			HighQuotaTarget:    80,
+			AutoReportToAdmin:  true,
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		return db.Create(&cfg).Error
+	}
+	changed := false
+	if strings.TrimSpace(cfg.TGAPIBase) == "" {
+		cfg.TGAPIBase = "https://api.telegram.org"
+		changed = true
+	}
+	if cfg.QuotaPer100 <= 0 {
+		cfg.QuotaPer100 = 50000000
+		changed = true
+	}
+	if cfg.PollSec <= 0 {
+		cfg.PollSec = 5
+		changed = true
+	}
+	if strings.TrimSpace(cfg.AutoExecTime) == "" {
+		cfg.AutoExecTime = "00:00"
+		changed = true
+	}
+	if cfg.LowQuotaThreshold <= 0 {
+		cfg.LowQuotaThreshold = 20
+		changed = true
+	}
+	if cfg.LowQuotaTarget <= 0 {
+		cfg.LowQuotaTarget = 100
+		changed = true
+	}
+	if cfg.HighQuotaThreshold <= 0 {
+		cfg.HighQuotaThreshold = 200
+		changed = true
+	}
+	if cfg.HighQuotaTarget <= 0 {
+		cfg.HighQuotaTarget = 80
+		changed = true
+	}
+	if changed {
+		cfg.UpdatedAt = time.Now().Unix()
+		return db.Save(&cfg).Error
 	}
 	return err
 }
@@ -319,6 +397,7 @@ func (s *Server) apiGetConfig(c *gin.Context) {
 	}
 	cfg.MainPassword = maskSecret(cfg.MainPassword)
 	cfg.BotToken = maskSecret(cfg.BotToken)
+	cfg.ProxyURL = maskSecret(cfg.ProxyURL)
 	c.JSON(200, gin.H{"success": true, "data": cfg})
 }
 
@@ -337,7 +416,18 @@ func (s *Server) apiSaveConfig(c *gin.Context) {
 
 	cfg.MainBaseURL = strings.TrimSpace(req.MainBaseURL)
 	cfg.MainUsername = strings.TrimSpace(req.MainUsername)
+	cfg.MainUseDB = req.MainUseDB
 	cfg.MainDBPath = strings.TrimSpace(req.MainDBPath)
+	if !cfg.MainUseDB {
+		cfg.MainDBPath = ""
+	}
+	cfg.ProxyEnabled = req.ProxyEnabled
+	if req.ProxyURL != "" && !strings.HasPrefix(req.ProxyURL, "***") {
+		cfg.ProxyURL = strings.TrimSpace(req.ProxyURL)
+	}
+	if strings.TrimSpace(req.TGAPIBase) != "" {
+		cfg.TGAPIBase = strings.TrimSpace(req.TGAPIBase)
+	}
 	if req.MainPassword != "" && !strings.HasPrefix(req.MainPassword, "***") {
 		cfg.MainPassword = req.MainPassword
 	}
@@ -355,6 +445,24 @@ func (s *Server) apiSaveConfig(c *gin.Context) {
 		req.QuotaPer100 = 50000000
 	}
 	cfg.QuotaPer100 = req.QuotaPer100
+	cfg.AutoQuotaEnabled = req.AutoQuotaEnabled
+	if req.AutoExecTime != "" {
+		cfg.AutoExecTime = req.AutoExecTime
+	}
+	if req.LowQuotaThreshold > 0 {
+		cfg.LowQuotaThreshold = req.LowQuotaThreshold
+	}
+	if req.LowQuotaTarget > 0 {
+		cfg.LowQuotaTarget = req.LowQuotaTarget
+	}
+	if req.HighQuotaThreshold > 0 {
+		cfg.HighQuotaThreshold = req.HighQuotaThreshold
+	}
+	if req.HighQuotaTarget > 0 {
+		cfg.HighQuotaTarget = req.HighQuotaTarget
+	}
+	cfg.AutoWhitelist = normalizeWhitelist(req.AutoWhitelist)
+	cfg.AutoReportToAdmin = req.AutoReportToAdmin
 	cfg.UpdatedAt = time.Now().Unix()
 
 	if err := s.db.Save(&cfg).Error; err != nil {
@@ -362,16 +470,28 @@ func (s *Server) apiSaveConfig(c *gin.Context) {
 		return
 	}
 
+	s.invalidateMainSession()
 	c.JSON(200, gin.H{"success": true})
 }
 
 func (s *Server) apiMainHealth(c *gin.Context) {
-	_, err := s.mainAPI(http.MethodGet, "/api/status", nil)
-	if err != nil {
-		c.JSON(200, gin.H{"success": false, "message": err.Error()})
+	checks := make([]string, 0, 3)
+	if _, err := s.mainAPI(http.MethodGet, "/api/status", nil); err != nil {
+		c.JSON(200, gin.H{"success": false, "message": "状态检查失败: " + err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{"success": true})
+	checks = append(checks, "status ok")
+	if _, err := s.mainAPI(http.MethodGet, "/api/user/?p=0&page_size=1", nil); err != nil {
+		c.JSON(200, gin.H{"success": false, "message": "用户接口不可用: " + err.Error()})
+		return
+	}
+	checks = append(checks, "user api ok")
+	if _, err := s.mainAPI(http.MethodGet, "/api/channel/?p=0&page_size=1&id_sort=true&tag_mode=true", nil); err != nil {
+		c.JSON(200, gin.H{"success": false, "message": "渠道接口不可用: " + err.Error()})
+		return
+	}
+	checks = append(checks, "channel api ok")
+	c.JSON(200, gin.H{"success": true, "message": "连接可用，可执行实际管理操作", "checks": checks})
 }
 
 func (s *Server) apiSearchDBPaths(c *gin.Context) {
@@ -427,13 +547,41 @@ func (s *Server) apiSearchDBPaths(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true, "data": result})
 }
 
+func (s *Server) invalidateMainSession() {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	s.mainUserID = 0
+	s.sessionAlive = false
+	s.mainClient = nil
+}
+
+func buildHTTPClient(proxyEnabled bool, proxyRaw string, withJar bool) (*http.Client, error) {
+	transport := &http.Transport{}
+	if proxyEnabled && strings.TrimSpace(proxyRaw) != "" {
+		pURL, err := url.Parse(strings.TrimSpace(proxyRaw))
+		if err != nil {
+			return nil, fmt.Errorf("代理地址格式错误: %w", err)
+		}
+		transport.Proxy = http.ProxyURL(pURL)
+	}
+	client := &http.Client{Timeout: 30 * time.Second, Transport: transport}
+	if withJar {
+		jar, _ := cookiejar.New(nil)
+		client.Jar = jar
+	}
+	return client, nil
+}
+
 func (s *Server) getMainClient(cfg AppConfig) (*http.Client, error) {
 	s.clientMu.Lock()
 	defer s.clientMu.Unlock()
 
 	if s.mainClient == nil || s.mainBaseURL != cfg.MainBaseURL {
-		jar, _ := cookiejar.New(nil)
-		s.mainClient = &http.Client{Timeout: 30 * time.Second, Jar: jar}
+		client, cErr := buildHTTPClient(cfg.ProxyEnabled, cfg.ProxyURL, true)
+		if cErr != nil {
+			return nil, cErr
+		}
+		s.mainClient = client
 		s.mainBaseURL = cfg.MainBaseURL
 		s.mainUserID = 0
 		s.sessionAlive = false
@@ -609,7 +757,11 @@ func (s *Server) syncCommands(token string) {
 			{"command": "redeem", "description": "交互生成兑换码"},
 		},
 	}
-	_, _ = tgCall(token, "setMyCommands", commands)
+	cfg, err := s.getConfig()
+	if err != nil {
+		return
+	}
+	_, _ = s.tgCall(cfg, "setMyCommands", commands)
 }
 
 func (s *Server) pollTelegram(cfg AppConfig) error {
@@ -617,8 +769,12 @@ func (s *Server) pollTelegram(cfg AppConfig) error {
 	offset := s.tgOffset
 	s.tgOffsetMu.Unlock()
 
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?timeout=25&offset=%d", cfg.BotToken, offset)
-	resp, err := http.Get(url)
+	client, err := buildHTTPClient(cfg.ProxyEnabled, cfg.ProxyURL, false)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/bot%s/getUpdates?timeout=25&offset=%d", strings.TrimRight(s.tgBase(cfg), "/"), cfg.BotToken, offset)
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
@@ -672,7 +828,7 @@ func (s *Server) handleTGMessage(cfg AppConfig, msg *TelegramMessage) {
 	}
 
 	text, markup := s.executeTGCommand(strings.TrimSpace(msg.Text))
-	_, _ = tgSend(cfg.BotToken, strconv.FormatInt(msg.Chat.ID, 10), text, markup)
+	_, _ = s.tgSend(cfg, strconv.FormatInt(msg.Chat.ID, 10), text, markup)
 }
 
 func (s *Server) handleTGCallback(cfg AppConfig, cb *TelegramCallback) {
@@ -680,18 +836,18 @@ func (s *Server) handleTGCallback(cfg AppConfig, cb *TelegramCallback) {
 		return
 	}
 	if !s.isTGAdmin(cfg, cb.From.ID) {
-		_, _ = tgCall(cfg.BotToken, "answerCallbackQuery", map[string]any{"callback_query_id": cb.ID, "text": "无权限"})
+		_, _ = s.tgCall(cfg, "answerCallbackQuery", map[string]any{"callback_query_id": cb.ID, "text": "无权限"})
 		return
 	}
 
 	text, markup, ack := s.executeTGCallback(cb.Data)
 	if cb.Message != nil && text != "" {
-		_, _ = tgSend(cfg.BotToken, strconv.FormatInt(cb.Message.Chat.ID, 10), text, markup)
+		_, _ = s.tgSend(cfg, strconv.FormatInt(cb.Message.Chat.ID, 10), text, markup)
 	}
 	if ack == "" {
 		ack = "已处理"
 	}
-	_, _ = tgCall(cfg.BotToken, "answerCallbackQuery", map[string]any{"callback_query_id": cb.ID, "text": ack})
+	_, _ = s.tgCall(cfg, "answerCallbackQuery", map[string]any{"callback_query_id": cb.ID, "text": ack})
 }
 
 func (s *Server) executeTGCommand(text string) (string, map[string]any) {
@@ -1041,12 +1197,203 @@ func (s *Server) createRedeem(amount, count int) string {
 	return strings.Join(lines, "\n")
 }
 
+func (s *Server) autoQuotaLoop() {
+	for {
+		cfg, err := s.getConfig()
+		if err != nil {
+			time.Sleep(20 * time.Second)
+			continue
+		}
+		if !cfg.AutoQuotaEnabled {
+			time.Sleep(20 * time.Second)
+			continue
+		}
+		hour, minute := parseHM(cfg.AutoExecTime)
+		now := time.Now()
+		today := now.Format("2006-01-02")
+		if cfg.LastAutoProcessDate == today {
+			time.Sleep(20 * time.Second)
+			continue
+		}
+		if now.Hour() == hour && now.Minute() >= minute {
+			_, _ = s.runAutoQuotaProcess(false)
+		}
+		time.Sleep(20 * time.Second)
+	}
+}
+
+func (s *Server) apiRunAutoQuotaNow(c *gin.Context) {
+	msg, err := s.runAutoQuotaProcess(true)
+	if err != nil {
+		c.JSON(200, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "message": msg})
+}
+
+func (s *Server) apiAutoQuotaLogs(c *gin.Context) {
+	limit := 200
+	if p := strings.TrimSpace(c.Query("limit")); p != "" {
+		if i, err := strconv.Atoi(p); err == nil && i > 0 && i <= 1000 {
+			limit = i
+		}
+	}
+	items := make([]AutoQuotaLog, 0)
+	if err := s.db.Order("id desc").Limit(limit).Find(&items).Error; err != nil {
+		c.JSON(500, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "data": items})
+}
+
+func (s *Server) runAutoQuotaProcess(force bool) (string, error) {
+	s.autoRunMu.Lock()
+	defer s.autoRunMu.Unlock()
+
+	cfg, err := s.getConfig()
+	if err != nil {
+		return "", err
+	}
+	if !force && !cfg.AutoQuotaEnabled {
+		return "未启用自动额度处理", nil
+	}
+	if cfg.LowQuotaTarget <= 0 || cfg.HighQuotaTarget <= 0 || cfg.LowQuotaThreshold <= 0 || cfg.HighQuotaThreshold <= 0 {
+		return "", fmt.Errorf("自动额度参数不完整")
+	}
+
+	raw, err := s.mainAPI(http.MethodGet, "/api/user/?p=0&page_size=1000", nil)
+	if err != nil {
+		return "", err
+	}
+	users := getItems(raw)
+	whiteSet := whitelistSet(cfg.AutoWhitelist)
+	changes := make([]AutoQuotaLog, 0)
+
+	for _, u := range users {
+		username := strings.TrimSpace(getMapString(u, "username"))
+		if username == "" {
+			continue
+		}
+		if _, ok := whiteSet[username]; ok {
+			continue
+		}
+		quotaRaw := int64(getMapNumber(u, "quota"))
+		before := s.quotaRawToDisplay(quotaRaw)
+		after := before
+		action := ""
+		reason := ""
+		if before < float64(cfg.LowQuotaThreshold) {
+			after = float64(cfg.LowQuotaTarget)
+			action = "增加"
+			reason = fmt.Sprintf("低于阈值 %d", cfg.LowQuotaThreshold)
+		} else if before > float64(cfg.HighQuotaThreshold) {
+			after = float64(cfg.HighQuotaTarget)
+			action = "减少"
+			reason = fmt.Sprintf("高于阈值 %d", cfg.HighQuotaThreshold)
+		}
+		if action == "" {
+			continue
+		}
+		newRaw := s.displayValueToRaw(after)
+		if newRaw < 0 {
+			newRaw = 0
+		}
+		payload := map[string]any{
+			"id":           int(getMapNumber(u, "id")),
+			"username":     username,
+			"display_name": getMapString(u, "display_name"),
+			"role":         int(getMapNumber(u, "role")),
+			"group":        getMapString(u, "group"),
+			"quota":        newRaw,
+			"remark":       getMapString(u, "remark"),
+		}
+		if _, err := s.mainAPI(http.MethodPut, "/api/user/", payload); err != nil {
+			log.Printf("auto quota update failed user=%s err=%v", username, err)
+			continue
+		}
+		delta := after - before
+		entry := AutoQuotaLog{
+			ProcessDate: time.Now().Format("2006-01-02"),
+			Username:    username,
+			Action:      action,
+			Reason:      reason,
+			BeforeQuota: before,
+			AfterQuota:  after,
+			DeltaQuota:  delta,
+			CreatedAt:   time.Now().Unix(),
+		}
+		changes = append(changes, entry)
+	}
+
+	if len(changes) > 0 {
+		for _, item := range changes {
+			_ = s.db.Create(&item).Error
+		}
+	}
+	cfg.LastAutoProcessDate = time.Now().Format("2006-01-02")
+	cfg.UpdatedAt = time.Now().Unix()
+	_ = s.db.Save(&cfg).Error
+
+	report := buildAutoQuotaReport(changes, cfg)
+	if cfg.AutoReportToAdmin && cfg.BotEnabled && strings.TrimSpace(cfg.BotToken) != "" {
+		adminIDs := splitAdminIDs(cfg.BotAdminIDs)
+		for _, id := range adminIDs {
+			_, _ = s.tgSend(cfg, id, report, nil)
+		}
+	}
+	return report, nil
+}
+
+func buildAutoQuotaReport(changes []AutoQuotaLog, cfg AppConfig) string {
+	lines := []string{
+		fmt.Sprintf("每日额度处理报告 %s", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("规则: < %d -> %d, > %d -> %d", cfg.LowQuotaThreshold, cfg.LowQuotaTarget, cfg.HighQuotaThreshold, cfg.HighQuotaTarget),
+	}
+	if len(changes) == 0 {
+		lines = append(lines, "本次没有用户被调整。")
+		return strings.Join(lines, "\n")
+	}
+	lines = append(lines, fmt.Sprintf("处理总数: %d", len(changes)))
+	for _, c := range changes {
+		lines = append(lines, fmt.Sprintf("用户 %s | %s | 处理前 %.2f | 处理后 %.2f | 变动 %.2f | %s", c.Username, c.Action, c.BeforeQuota, c.AfterQuota, c.DeltaQuota, c.Reason))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func parseHM(hm string) (int, int) {
+	hm = strings.TrimSpace(hm)
+	if hm == "" {
+		return 0, 0
+	}
+	parts := strings.Split(hm, ":")
+	if len(parts) != 2 {
+		return 0, 0
+	}
+	h, _ := strconv.Atoi(parts[0])
+	m, _ := strconv.Atoi(parts[1])
+	if h < 0 || h > 23 {
+		h = 0
+	}
+	if m < 0 || m > 59 {
+		m = 0
+	}
+	return h, m
+}
+
 func (s *Server) displayAmountToRaw(amount int) int64 {
 	cfg, err := s.getConfig()
 	if err != nil || cfg.QuotaPer100 <= 0 {
 		return int64(amount) * 500000
 	}
 	return int64(amount) * cfg.QuotaPer100 / 100
+}
+
+func (s *Server) displayValueToRaw(amount float64) int64 {
+	cfg, err := s.getConfig()
+	if err != nil || cfg.QuotaPer100 <= 0 {
+		return int64(amount * 500000.0)
+	}
+	return int64(amount * float64(cfg.QuotaPer100) / 100.0)
 }
 
 func (s *Server) quotaRawToDisplay(raw int64) float64 {
@@ -1057,9 +1404,21 @@ func (s *Server) quotaRawToDisplay(raw int64) float64 {
 	return float64(raw) * 100.0 / float64(cfg.QuotaPer100)
 }
 
-func tgCall(token, method string, payload map[string]any) ([]byte, error) {
+func (s *Server) tgBase(cfg AppConfig) string {
+	if strings.TrimSpace(cfg.TGAPIBase) == "" {
+		return "https://api.telegram.org"
+	}
+	return strings.TrimSpace(cfg.TGAPIBase)
+}
+
+func (s *Server) tgCall(cfg AppConfig, method string, payload map[string]any) ([]byte, error) {
 	body, _ := json.Marshal(payload)
-	resp, err := http.Post("https://api.telegram.org/bot"+token+"/"+method, "application/json", bytes.NewReader(body))
+	client, err := buildHTTPClient(cfg.ProxyEnabled, cfg.ProxyURL, false)
+	if err != nil {
+		return nil, err
+	}
+	url := strings.TrimRight(s.tgBase(cfg), "/") + "/bot" + cfg.BotToken + "/" + method
+	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -1071,12 +1430,44 @@ func tgCall(token, method string, payload map[string]any) ([]byte, error) {
 	return raw, nil
 }
 
-func tgSend(token, chatID, text string, markup map[string]any) ([]byte, error) {
+func (s *Server) tgSend(cfg AppConfig, chatID, text string, markup map[string]any) ([]byte, error) {
 	payload := map[string]any{"chat_id": chatID, "text": text}
 	if markup != nil {
 		payload["reply_markup"] = markup
 	}
-	return tgCall(token, "sendMessage", payload)
+	return s.tgCall(cfg, "sendMessage", payload)
+}
+
+func (s *Server) apiTGSendTest(c *gin.Context) {
+	cfg, err := s.getConfig()
+	if err != nil {
+		c.JSON(500, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	if strings.TrimSpace(cfg.BotToken) == "" {
+		c.JSON(200, gin.H{"success": false, "message": "请先配置 TG Bot Token"})
+		return
+	}
+	adminIDs := splitAdminIDs(cfg.BotAdminIDs)
+	if len(adminIDs) == 0 {
+		c.JSON(200, gin.H{"success": false, "message": "请先配置管理员 TG ID"})
+		return
+	}
+	okCnt := 0
+	failLines := make([]string, 0)
+	msg := fmt.Sprintf("API-WEB-TGBOT 测试消息\n时间: %s\n状态: 发送测试成功", time.Now().Format("2006-01-02 15:04:05"))
+	for _, id := range adminIDs {
+		if _, err := s.tgSend(cfg, id, msg, nil); err != nil {
+			failLines = append(failLines, fmt.Sprintf("%s: %v", id, err))
+			continue
+		}
+		okCnt++
+	}
+	if okCnt == 0 {
+		c.JSON(200, gin.H{"success": false, "message": "测试消息全部发送失败", "fails": failLines})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "message": fmt.Sprintf("测试消息发送完成，成功 %d，失败 %d", okCnt, len(failLines)), "fails": failLines})
 }
 
 func isSuccess(raw []byte) bool {
@@ -1212,6 +1603,33 @@ func splitAdminIDs(input string) []string {
 
 func normalizeAdminIDs(input string) string {
 	return strings.Join(splitAdminIDs(input), ",")
+}
+
+func splitWhitelist(input string) []string {
+	f := strings.FieldsFunc(input, func(r rune) bool {
+		return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
+	})
+	out := make([]string, 0, len(f))
+	for _, it := range f {
+		it = strings.TrimSpace(it)
+		if it != "" {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+func normalizeWhitelist(input string) string {
+	return strings.Join(splitWhitelist(input), ",")
+}
+
+func whitelistSet(input string) map[string]struct{} {
+	items := splitWhitelist(input)
+	m := make(map[string]struct{}, len(items))
+	for _, it := range items {
+		m[it] = struct{}{}
+	}
+	return m
 }
 
 func maskSecret(s string) string {

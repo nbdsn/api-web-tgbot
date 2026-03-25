@@ -6,6 +6,15 @@
 sudo bash <(curl -fsSL https://raw.githubusercontent.com/nbdsn/api-web-tgbot/main/scripts/install_from_github.sh)
 ```
 
+## 离线安装命令
+
+```bash
+curl -fL https://github.com/nbdsn/api-web-tgbot/releases/latest/download/api-web-tgbot-offline-latest.tar.gz -o /tmp/api-web-tgbot-offline-latest.tar.gz
+mkdir -p /tmp/api-web-tgbot-offline
+tar -xzf /tmp/api-web-tgbot-offline-latest.tar.gz -C /tmp/api-web-tgbot-offline
+sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh menu /tmp/api-web-tgbot-offline
+```
+
 ## 交互安装参数
 
 脚本会提示：
