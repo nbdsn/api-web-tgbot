@@ -124,11 +124,15 @@ docker run -d \
 - 主程序数据库路径填写：`/data/newapi/one-api.db`
 
 ### 4) TG 反代怎么填
-如果你反代域名是：
-- `https://telegram.202353.xyz`
+如果你有可反代 Telegram Bot API 的服务器域名（示例）：
+- `https://tgapi.yourdomain.com`
 
 那在本程序 TG 配置里：
-- `TG API Base` 填：`https://telegram.202353.xyz`
+- `TG API Base` 填：`https://tgapi.yourdomain.com`
+
+要求：
+- 必须启用 SSL（HTTPS）
+- 反代需要支持 `/bot<token>/...` 路径转发到 Telegram 官方 Bot API
 
 GHCR 镜像（可选）：
 
