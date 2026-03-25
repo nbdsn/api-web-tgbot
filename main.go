@@ -414,8 +414,12 @@ func (s *Server) apiSaveConfig(c *gin.Context) {
 		return
 	}
 
-	cfg.MainBaseURL = strings.TrimSpace(req.MainBaseURL)
-	cfg.MainUsername = strings.TrimSpace(req.MainUsername)
+	if strings.TrimSpace(req.MainBaseURL) != "" {
+		cfg.MainBaseURL = strings.TrimSpace(req.MainBaseURL)
+	}
+	if strings.TrimSpace(req.MainUsername) != "" {
+		cfg.MainUsername = strings.TrimSpace(req.MainUsername)
+	}
 	cfg.MainUseDB = req.MainUseDB
 	cfg.MainDBPath = strings.TrimSpace(req.MainDBPath)
 	if !cfg.MainUseDB {

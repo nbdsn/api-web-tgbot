@@ -281,29 +281,29 @@
       document.getElementById('dbModeBlock').classList.toggle('hidden', !useDB);
     }
 
-    function collectConfig() {
+    function buildPayloadFromCache() {
       return {
-        mainBaseURL: document.getElementById('mainBaseURL').value.trim(),
-        mainUsername: document.getElementById('mainUsername').value.trim(),
-        mainPassword: document.getElementById('mainPassword').value,
-        mainUseDB: document.getElementById('mainUseDB').value === 'true',
-        mainDBPath: document.getElementById('mainDBPath').value.trim(),
-        proxyEnabled: document.getElementById('proxyEnabled').value === 'true',
-        proxyURL: document.getElementById('proxyURL').value.trim(),
-        botEnabled: document.getElementById('botEnabled').value === 'true',
-        botToken: document.getElementById('botToken').value.trim(),
-        tgapiBase: document.getElementById('tgApiBase').value.trim(),
-        botAdminIDs: document.getElementById('botAdminIDs').value.trim(),
-        pollSec: Number(document.getElementById('pollSec').value || 5),
-        quotaPer100: Number(document.getElementById('quotaPer100').value || 50000000),
-        autoQuotaEnabled: document.getElementById('autoQuotaEnabled').value === 'true',
-        autoExecTime: document.getElementById('autoExecTime').value.trim(),
-        lowQuotaThreshold: Number(document.getElementById('lowQuotaThreshold').value || 20),
-        lowQuotaTarget: Number(document.getElementById('lowQuotaTarget').value || 100),
-        highQuotaThreshold: Number(document.getElementById('highQuotaThreshold').value || 200),
-        highQuotaTarget: Number(document.getElementById('highQuotaTarget').value || 80),
-        autoWhitelist: document.getElementById('autoWhitelist').value,
-        autoReportToAdmin: document.getElementById('autoReportToAdmin').value === 'true'
+        mainBaseURL: configCache.MainBaseURL || '',
+        mainUsername: configCache.MainUsername || '',
+        mainPassword: configCache.MainPassword || '',
+        mainUseDB: Boolean(configCache.MainUseDB),
+        mainDBPath: configCache.MainDBPath || '',
+        proxyEnabled: Boolean(configCache.ProxyEnabled),
+        proxyURL: configCache.ProxyURL || '',
+        botEnabled: Boolean(configCache.BotEnabled),
+        botToken: configCache.BotToken || '',
+        tgapiBase: configCache.TGAPIBase || 'https://api.telegram.org',
+        botAdminIDs: configCache.BotAdminIDs || '',
+        pollSec: Number(configCache.PollSec || 5),
+        quotaPer100: Number(configCache.QuotaPer100 || 50000000),
+        autoQuotaEnabled: Boolean(configCache.AutoQuotaEnabled),
+        autoExecTime: configCache.AutoExecTime || '00:00',
+        lowQuotaThreshold: Number(configCache.LowQuotaThreshold || 20),
+        lowQuotaTarget: Number(configCache.LowQuotaTarget || 100),
+        highQuotaThreshold: Number(configCache.HighQuotaThreshold || 200),
+        highQuotaTarget: Number(configCache.HighQuotaTarget || 80),
+        autoWhitelist: configCache.AutoWhitelist || '',
+        autoReportToAdmin: configCache.AutoReportToAdmin !== false
       };
     }
 
@@ -338,12 +338,7 @@
       toggleDBMode();
     }
 
-    async function saveAll(msgId) {
-      const payload = collectConfig();
-      if (!payload.mainPassword && configCache.MainPassword) payload.mainPassword = configCache.MainPassword;
-      if (!payload.botToken && configCache.BotToken) payload.botToken = configCache.BotToken;
-      if (!payload.proxyURL && configCache.ProxyURL) payload.proxyURL = configCache.ProxyURL;
-
+    async function savePayload(payload, msgId) {
       const data = await api('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -355,6 +350,42 @@
       }
       setMsg(msgId, true, '保存成功');
       await loadConfig();
+    }
+
+    async function saveMainConfig() {
+      const payload = buildPayloadFromCache();
+      payload.mainBaseURL = document.getElementById('mainBaseURL').value.trim();
+      payload.mainUsername = document.getElementById('mainUsername').value.trim();
+      payload.mainPassword = document.getElementById('mainPassword').value || payload.mainPassword;
+      payload.mainUseDB = document.getElementById('mainUseDB').value === 'true';
+      payload.mainDBPath = document.getElementById('mainDBPath').value.trim();
+      payload.proxyEnabled = document.getElementById('proxyEnabled').value === 'true';
+      payload.proxyURL = document.getElementById('proxyURL').value.trim() || payload.proxyURL;
+      return savePayload(payload, 'mainMsg');
+    }
+
+    async function saveTGConfig() {
+      const payload = buildPayloadFromCache();
+      payload.botEnabled = document.getElementById('botEnabled').value === 'true';
+      payload.botToken = document.getElementById('botToken').value.trim() || payload.botToken;
+      payload.tgapiBase = document.getElementById('tgApiBase').value.trim();
+      payload.botAdminIDs = document.getElementById('botAdminIDs').value.trim();
+      payload.pollSec = Number(document.getElementById('pollSec').value || 5);
+      payload.quotaPer100 = Number(document.getElementById('quotaPer100').value || 50000000);
+      return savePayload(payload, 'tgMsg');
+    }
+
+    async function saveAutoConfig() {
+      const payload = buildPayloadFromCache();
+      payload.autoQuotaEnabled = document.getElementById('autoQuotaEnabled').value === 'true';
+      payload.autoExecTime = document.getElementById('autoExecTime').value.trim();
+      payload.lowQuotaThreshold = Number(document.getElementById('lowQuotaThreshold').value || 20);
+      payload.lowQuotaTarget = Number(document.getElementById('lowQuotaTarget').value || 100);
+      payload.highQuotaThreshold = Number(document.getElementById('highQuotaThreshold').value || 200);
+      payload.highQuotaTarget = Number(document.getElementById('highQuotaTarget').value || 80);
+      payload.autoWhitelist = document.getElementById('autoWhitelist').value;
+      payload.autoReportToAdmin = document.getElementById('autoReportToAdmin').value === 'true';
+      return savePayload(payload, 'autoMsg');
     }
 
     async function testMain() {
@@ -543,14 +574,14 @@
 
     function bindEvents() {
       document.getElementById('mainUseDB').addEventListener('change', toggleDBMode);
-      document.getElementById('saveMainBtn').addEventListener('click', () => saveAll('mainMsg'));
+      document.getElementById('saveMainBtn').addEventListener('click', saveMainConfig);
       document.getElementById('testMainBtn').addEventListener('click', testMain);
       document.getElementById('searchDBBtn').addEventListener('click', searchDBPaths);
 
-      document.getElementById('saveTGBtn').addEventListener('click', () => saveAll('tgMsg'));
+      document.getElementById('saveTGBtn').addEventListener('click', saveTGConfig);
       document.getElementById('tgTestBtn').addEventListener('click', sendTGTest);
 
-      document.getElementById('saveAutoBtn').addEventListener('click', () => saveAll('autoMsg'));
+      document.getElementById('saveAutoBtn').addEventListener('click', saveAutoConfig);
       document.getElementById('runAutoNowBtn').addEventListener('click', runAutoNow);
       document.getElementById('loadAutoLogsBtn').addEventListener('click', loadAutoLogs);
 
