@@ -1,93 +1,116 @@
 # api-web-tgbot
 
-独立版 NewAPI 管理助手（Web + Telegram Bot）。
+独立版 NewAPI 管理助手（Web + Telegram Bot），不改主程序代码，通过主程序 API 管理。
 
-项目与主程序解耦，不改主程序代码，通过主程序 API 完成管理操作。
+## 功能
+- 独立后台登录（默认 `admin/admin`，可修改）
+- 主程序连接配置（非数据库模式默认开启）
+- 可选数据库模式（仅在你明确要扫库时开启）
+- TG 管理（命令菜单、用户管理、兑换码、统计）
+- 每日自动额度处理 + 日志 + TG 推送
+- 渠道管理
+- 代理支持（HTTP/SOCKS5）
 
-## 核心能力
+## 安装方式（只保留两种）
 
-- 独立登录后台（默认 `admin/admin`，支持后台修改账号密码）
-- 主程序连接配置（地址、账号、密码）
-- 数据库模式开关（默认不使用；开启后可选数据库路径并支持一键搜索）
-- API 可用性校验（不仅测试连通，还会校验用户/渠道接口是否可操作）
-- 代理配置（支持 `http://` 和 `socks5://`）
-- TG 配置（Token、管理员 ID、轮询间隔、TG API Base）
-- TG 测试消息发送
-- TG 命令二级菜单（`/stats` `/users` `/redeem`）
-- 渠道管理（新增、刷新、启停、删除）
-- 每日自动额度处理（时间、阈值、目标值、白名单、管理员报告）
-- 自动处理日志（Web 查看最近日志）
-- 安装/运维菜单（安装、启动、停止、重启、状态、备份、还原、清库、卸载）
-- Docker 构建与运行
-
-## 功能依赖说明
-
-- 渠道管理：仅依赖主程序 API
-- TG 命令管理：仅依赖主程序 API
-- 自动额度处理：仅依赖主程序 API
-- 数据库路径：仅在你开启“数据库模式”时才需要
-
-## 一键安装（在线）
+### 1) 海外服务器（可访问 GitHub）一键安装
+直接运行：
 
 ```bash
 sudo bash <(curl -fsSL https://raw.githubusercontent.com/nbdsn/api-web-tgbot/main/scripts/install_from_github.sh)
 ```
 
-## 离线安装（无 Git 环境）
+执行后会进入交互菜单：
+- 未安装：先提示输入安装目录/数据目录/端口（回车用默认）
+- 已安装：直接进入管理菜单（启动/停止/重启/备份/还原/清库/卸载）
 
-### 离线包下载链接
+### 2) 国内服务器（无法拉 Git）离线安装
+
+离线包下载地址（发布后可直接下载）：
 
 ```text
 https://github.com/nbdsn/api-web-tgbot/releases/latest/download/api-web-tgbot-offline-latest.tar.gz
 ```
 
-> 如果首次访问是 404，表示你还没发布离线包，请先在本地执行 `bash scripts/make_offline_package.sh` 并上传到 Release。
+如果你手里已有离线包（例如 `api-web-tgbot-offline-20260325.tar.gz`），把它上传到服务器任意目录即可，推荐 `/tmp`。
 
-### 安装命令
+#### 2.1 上传到服务器
+可用 `scp`（在本地执行）：
 
 ```bash
-curl -fL https://github.com/nbdsn/api-web-tgbot/releases/latest/download/api-web-tgbot-offline-latest.tar.gz -o /tmp/api-web-tgbot-offline-latest.tar.gz
+scp -P <SSH端口> ./api-web-tgbot-offline-*.tar.gz root@<服务器IP>:/tmp/
+```
+
+#### 2.2 在服务器安装
+在服务器执行：
+
+```bash
 mkdir -p /tmp/api-web-tgbot-offline
-tar -xzf /tmp/api-web-tgbot-offline-latest.tar.gz -C /tmp/api-web-tgbot-offline
+tar -xzf /tmp/api-web-tgbot-offline-*.tar.gz -C /tmp/api-web-tgbot-offline
 sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh menu /tmp/api-web-tgbot-offline
 ```
 
-## 本地开发
+## 管理命令
+如果已安装，可直接运行：
 
 ```bash
-go mod tidy
-go run .
+sudo bash /tmp/api-web-tgbot-src/scripts/jdc_manager.sh
 ```
 
-默认：
+或者离线目录：
 
-- 监听：`8088`
-- 数据目录：`./data`
-- 管理数据库：`./data/manager.db`
+```bash
+sudo bash /tmp/api-web-tgbot-offline/scripts/jdc_manager.sh
+```
 
-环境变量：
+菜单支持：
+- 启动/停止/重启/状态
+- 备份数据库
+- 还原数据库
+- 清空数据库（恢复初始后台账号）
+- 卸载程序（保留数据目录与日志）
 
-- `PORT`：监听端口
-- `DATA_DIR`：本地数据目录
-- `SESSION_SECRET`：会话密钥
+## Docker（可选，更快部署）
 
-## Docker
+### 方式 A：直接拉镜像运行（推荐）
+GHCR 镜像：
+
+```bash
+docker run -d \
+  --name api-web-tgbot \
+  --restart unless-stopped \
+  -p 8088:8088 \
+  -e DATA_DIR=/data/api-web-tgbot \
+  -e PORT=8088 \
+  -v /data/api-web-tgbot:/data/api-web-tgbot \
+  ghcr.io/nbdsn/api-web-tgbot:latest
+```
+
+### 方式 B：本地构建
 
 ```bash
 docker compose up -d --build
 ```
 
-默认映射：
+## Docker Hub 说明
+- 已支持在 GitHub Actions 中“可选推送 Docker Hub”（需你在仓库 Secrets 配置）：
+  - `DOCKERHUB_USERNAME`
+  - `DOCKERHUB_TOKEN`
+- 配置后会自动推送：
+  - `<dockerhub用户名>/api-web-tgbot:latest`
+  - `<dockerhub用户名>/api-web-tgbot:sha-...`
 
-- `8088:8088`
-- `./data:/data/api-web-tgbot`
+## 离线包发布（给国内机用）
+在本地打包：
 
-## 目录说明
+```bash
+bash scripts/make_offline_package.sh
+```
 
-- `main.go`：后端服务
-- `web/login.html`：登录页
-- `web/index.html`：管理后台
-- `scripts/jdc_manager.sh`：安装/运维菜单脚本
-- `scripts/install_from_github.sh`：在线安装入口
-- `scripts/make_offline_package.sh`：离线包打包脚本
-- `.github/workflows/build.yml`：构建与 Docker 工作流
+生成文件在 `dist/`，然后上传到 GitHub Release，建议额外上传一份同文件内容的别名：
+
+```text
+api-web-tgbot-offline-latest.tar.gz
+```
+
+这样国内机安装命令可长期固定不变。
