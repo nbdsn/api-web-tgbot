@@ -86,6 +86,30 @@ docker run -d \
   nbdsn/api-web-tgbot:latest
 ```
 
+目录映射说明（非常重要）：
+- 容器内 `/data/api-web-tgbot`：本程序的数据目录（`manager.db`、自动额度处理日志、后台配置等）
+- 宿主机 `/data/api-web-tgbot`：你服务器上的持久化目录，可自定义为任何绝对路径
+- 这个映射只保存“本程序数据”，不会自动保存 NewAPI 主程序数据库
+
+如果你要让“数据库模式”读取主程序数据库（可选），再额外挂载主程序数据库目录，例如：
+
+```bash
+docker run -d \
+  --name api-web-tgbot \
+  --restart unless-stopped \
+  -p 8088:8088 \
+  -e DATA_DIR=/data/api-web-tgbot \
+  -e PORT=8088 \
+  -v /data/api-web-tgbot:/data/api-web-tgbot \
+  -v /data/newapi:/data/newapi:ro \
+  nbdsn/api-web-tgbot:latest
+```
+
+上面第二个挂载说明：
+- 宿主机 `/data/newapi`：NewAPI 主程序数据库所在目录（示例）
+- 容器内 `/data/newapi`：你在 Web 的“主程序数据库路径”里可填写这里的路径
+- `:ro` 为只读挂载，避免误写主程序文件
+
 GHCR 镜像（可选）：
 
 ```bash
