@@ -1,4 +1,5 @@
 FROM golang:1.24-alpine AS builder
+RUN apk add --no-cache build-base
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download
