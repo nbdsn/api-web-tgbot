@@ -30,6 +30,35 @@
 sudo bash <(curl -fsSL https://raw.githubusercontent.com/nbdsn/api-web-tgbot/main/scripts/install_from_github.sh)
 ```
 
+## 国内专用安装（Gitee）
+
+先把本仓库同步到你的 Gitee 仓库，然后在服务器执行：
+
+```bash
+curl -fsSL https://gitee.com/<你的账号>/<你的仓库>/raw/main/scripts/install_from_gitee.sh -o /tmp/install_from_gitee.sh
+GITEE_REPO_URL=https://gitee.com/<你的账号>/<你的仓库>.git sudo bash /tmp/install_from_gitee.sh
+```
+
+说明：
+
+- 脚本会从 Gitee 拉源码，不依赖 GitHub
+- 安装时会自动设置 Go 代理为 `https://goproxy.cn,direct`
+- 如果你不想走 git，可用下方“离线安装”
+
+## 离线安装（完全内网）
+
+1. 本地打包：
+
+```bash
+tar -czf api-web-tgbot.tar.gz .
+```
+
+2. 上传到服务器后执行：
+
+```bash
+sudo bash scripts/install_offline.sh /tmp/api-web-tgbot.tar.gz
+```
+
 执行后行为：
 
 - 未安装：进入交互安装（可自定义安装目录、数据目录、端口，回车使用默认）
