@@ -785,23 +785,20 @@ func (s *Server) pollTelegram(cfg AppConfig) error {
 	offset := s.tgOffset
 	s.tgOffsetMu.Unlock()
 
-	client, err := buildHTTPClient(cfg.ProxyEnabled, cfg.ProxyURL, false)
+	raw, err := s.tgCall(cfg, "getUpdates", map[string]any{
+		"timeout": 25,
+		"offset":  offset,
+		"allowed_updates": []string{
+			"message",
+			"callback_query",
+		},
+	})
 	if err != nil {
 		return err
-	}
-	url := fmt.Sprintf("%s/bot%s/getUpdates?timeout=25&offset=%d", strings.TrimRight(s.tgBase(cfg), "/"), cfg.BotToken, offset)
-	resp, err := client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		raw, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("getUpdates failed: %s", string(raw))
 	}
 
 	var updates TelegramUpdateResp
-	if err := json.NewDecoder(resp.Body).Decode(&updates); err != nil {
+	if err := json.Unmarshal(raw, &updates); err != nil {
 		return err
 	}
 
